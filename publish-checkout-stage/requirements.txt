@@ -1,0 +1,12 @@
+# computational-biology-portfolio — pinned dependencies
+# Pinned for reproducibility (ICH E6(R2) data-integrity principle: analyses
+# must be re-executable with an identical software environment on
+# Google Colab / GitHub Codespaces). Lightweight stack only: no ML models,
+# no GPU, peak RAM < 100 MB.
+biopython==1.84
+pandas==2.2.2
+numpy==1.26.4          # <2.0 pin keeps Biopython & pandas binary-ABI compatible
+seaborn==0.13.2
+matplotlib==3.9.2
+requests==2.32.3
+beautifulsoup4==4.12.3

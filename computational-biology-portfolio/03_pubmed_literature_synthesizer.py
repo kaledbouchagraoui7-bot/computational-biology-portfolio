@@ -115,6 +115,31 @@ def http_get_with_backoff(url: str, params: dict | None = None) -> requests.Resp
     raise RuntimeError(f"GET failed after {MAX_RETRIES} retries: {last_exc}")
 
 
+def http_post_json_with_backoff(url: str, json_data: dict,
+                                params: dict | None = None) -> requests.Response:
+    """POST JSON with the same exponential-backoff policy as GET."""
+    last_exc: Exception | None = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            resp = requests.post(url, json=json_data, params=params, timeout=30,
+                                 headers={"User-Agent": DEFAULT_ENTREZ_TOOL})
+            if resp.status_code in (503, 429) and attempt < MAX_RETRIES:
+                wait = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
+                log(f"HTTP {resp.status_code}; backing off {wait}s "
+                    f"(retry {attempt + 1}/{MAX_RETRIES})")
+                time.sleep(wait)
+                continue
+            return resp
+        except (requests.ConnectionError, requests.Timeout,
+                urllib.error.URLError) as exc:
+            last_exc = exc
+            if attempt < MAX_RETRIES:
+                wait = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
+                log(f"Network error ({type(exc).__name__}); backing off {wait}s")
+                time.sleep(wait)
+    raise RuntimeError(f"POST failed after {MAX_RETRIES} retries: {last_exc}")
+
+
 # ---------------------------------------------------------------------------
 # Abstract text hygiene — BeautifulSoup used ONLY for markup stripping.
 # ---------------------------------------------------------------------------
@@ -171,6 +196,12 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
 
     Returns (records, duplicates_removed). Raises RuntimeError on hard failure
     so the caller can decide when to degrade to Europe PMC.
+
+    Resilience note (ALCOA+ 'Accurate'): NCBI's abstract-XML feed is
+    occasionally truncated mid-record upstream; a whole-batch parse would then
+    throw away every record. We therefore split the payload into complete
+    <PubmedArticle> units and parse each independently — partial transport
+    damage degrades to dropping single records (logged), never the batch.
     """
     from Bio import Entrez  # deferred import: fallback must work without it
 
@@ -192,72 +223,21 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     if not id_list:
         return [], 0
 
-    # Batched efetch keeps memory < 100 MB and respects rate limits.
+    # --- efetch: raw bytes, per-article parsing (truncation-resilient) -----
     records: list[dict] = []
     batch = 50
     for i in range(0, len(id_list), batch):
         chunk = id_list[i:i + batch]
         handle = Entrez.efetch(db="pubmed", id=",".join(chunk),
                                rettype="abstract", retmode="xml")
-        root = Entrez.read(handle, validate=False)
+        raw = handle.read()
         handle.close()
-        for art in root.get("PubmedArticle", []):
-            medline = art.get("MedlineCitation", {})
-            pmid = str(medline.get("PMID", ""))
-            article = medline.get("Article", {})
-            title = clean_abstract_text(str(article.get("ArticleTitle", "")))
-            # authors: collective first if present, else person list
-            author_list = article.get("AuthorList", [])
-            names: list[tuple[str, str]] = []
-            for a in author_list:
-                if getattr(a, "type", None) == "CollectiveName" or (
-                        "CollectiveName" in a and "LastName" not in a):
-                    names.append((str(a.get("CollectiveName", "")), ""))
-                else:
-                    last = str(a.get("LastName", ""))
-                    first_i = str(a.get("Initials", a.get("ForeName", "")))
-                    if last:
-                        names.append((last, first_i))
-            journal = ""
-            try:
-                journal = str(article["Journal"].get("Title", "")) or \
-                          str(article["Journal"].get("ISOAbbreviation", ""))
-            except Exception:
-                pass
-            pub_year = ""
-            try:
-                dt = article.get("Journal", {}).get("JournalIssue", {}).get(
-                    "PubDate", {})
-                pub_year = str(dt.get("Year", "")).strip()
-                if not pub_year and str(dt.get("MedlineDate", "")):
-                    m = re.search(r"\b(19|20)\d{2}\b", str(dt["MedlineDate"]))
-                    pub_year = m.group(0) if m else ""
-            except Exception:
-                pass
-            doi = ""
-            for aid in article.get("ArticleIdList", []):
-                if str(aid).lower().startswith("10."):
-                    doi = str(aid)
-                    break
-            if not doi:
-                try:
-                    for eloc in article.get("ELocationID", []):
-                        if getattr(eloc, "EIdType", "") == "doi":
-                            doi = str(eloc)
-                            break
-                except Exception:
-                    pass
-            abstract_parts = []
-            for ab in article.get("Abstract", {}).get("AbstractText", []):
-                abstract_parts.append(str(ab))
-            abstract = clean_abstract_text(" ".join(abstract_parts))
-
-            records.append({
-                "pmid": pmid, "title": title,
-                "authors": format_authors(names), "journal": journal,
-                "pub_year": pub_year, "doi": doi, "abstract": abstract,
-                "source": "ncbi_entrez",
-            })
+        if isinstance(raw, str):
+            raw = raw.encode("utf-8", errors="replace")
+        for art in _iter_pubmed_articles(raw):
+            parsed = _parse_pubmed_article(art)
+            if parsed:
+                records.append(parsed)
         polite_sleep()
         if len(records) >= max_records * 2:
             break
@@ -265,9 +245,177 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     return records, 0
 
 
+def _iter_pubmed_articles(raw: bytes):
+    """Yield parsed PubmedArticle elements, skipping truncated fragments.
+
+    Each fragment is re-serialised as a standalone document (XML declaration +
+    DTD from the original payload) because Bio.Entrez requires both to select
+    the correct PubMed DTD parser.
+    """
+    from Bio import Entrez
+    import io
+    start_tag, end_tag = b"<PubmedArticle>", b"</PubmedArticle>"
+    decl = raw[:raw.find(start_tag)] if start_tag in raw else b""
+    preamble = b'<?xml version="1.0" ?>\n'
+    for line in decl.splitlines():
+        if line.strip().startswith(b"<!DOCTYPE"):
+            preamble += line + b"\n"
+            break
+    pos = 0
+    while True:
+        s = raw.find(start_tag, pos)
+        if s == -1:
+            break
+        e = raw.find(end_tag, s)
+        if e == -1:
+            log("[warn] Truncated final PubmedArticle in NCBI payload; "
+                "discarding incomplete fragment.")
+            break
+        unit = preamble + raw[s:e + len(end_tag)]
+        try:
+            doc = Entrez.read(io.BytesIO(unit), validate=False)
+            # A single-article document returns the PubmedArticle *contents*
+            # directly (keys MedlineCitation/PubmedData); a multi-article
+            # document returns {'PubmedArticle': [...]}. Normalise both.
+            if "MedlineCitation" in doc:
+                yield doc
+            else:
+                for art in doc.get("PubmedArticle", []):
+                    yield art
+        except Exception as exc:
+            log(f"[warn] Skipping unparsable PubmedArticle fragment ({exc}).")
+        pos = e + len(end_tag)
+
+
+def _parse_pubmed_article(article_el) -> dict | None:
+    """MedlineCitation XML -> flat bibliographic record (PMID-first)."""
+    medline = article_el.get("MedlineCitation", {})
+    pmid = str(medline.get("PMID", ""))
+    article = medline.get("Article", {})
+    title = clean_abstract_text(str(article.get("ArticleTitle", "")))
+
+    names: list[tuple[str, str]] = []
+    author_list = article.get("AuthorList", [])
+    for a in author_list:
+        if getattr(a, "type", None) == "CollectiveName" or (
+                "CollectiveName" in a and "LastName" not in a):
+            names.append((str(a.get("CollectiveName", "")), ""))
+        else:
+            last = str(a.get("LastName", ""))
+            first_i = str(a.get("Initials", a.get("ForeName", "")))
+            if last:
+                names.append((last, first_i))
+
+    journal = ""
+    try:
+        journal = str(article["Journal"].get("Title", "")) or \
+                  str(article["Journal"].get("ISOAbbreviation", ""))
+    except Exception:
+        pass
+
+    pub_year = ""
+    try:
+        dt = article.get("Journal", {}).get("JournalIssue", {}).get("PubDate", {})
+        pub_year = str(dt.get("Year", "")).strip()
+        if not pub_year and str(dt.get("MedlineDate", "")):
+            m = re.search(r"\b(19|20)\d{2}\b", str(dt["MedlineDate"]))
+            pub_year = m.group(0) if m else ""
+    except Exception:
+        pass
+
+    doi = ""
+    for aid in article.get("ArticleIdList", []):
+        if str(aid).lower().startswith("10."):
+            doi = str(aid)
+            break
+    if not doi:
+        try:
+            for eloc in article.get("ELocationID", []):
+                if getattr(eloc, "EIdType", "") == "doi":
+                    doi = str(eloc)
+                    break
+        except Exception:
+            pass
+
+    abstract_parts = []
+    for ab in article.get("Abstract", {}).get("AbstractText", []):
+        abstract_parts.append(str(ab))
+    abstract = clean_abstract_text(" ".join(abstract_parts))
+
+    return {
+        "pmid": pmid, "title": title,
+        "authors": format_authors(names), "journal": journal,
+        "pub_year": pub_year, "doi": doi, "abstract": abstract,
+        "source": "ncbi_entrez",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Fallback source: Europe PMC REST JSON (cursorMark pagination)
 # ---------------------------------------------------------------------------
+def _epmc_page(params: dict) -> dict | None:
+    """Fetch one Europe PMC page; tolerate the documented 'lite' degradation.
+
+    Regulatory relevance (ALCOA+ 'Complete'): the search backend occasionally
+    marks its rich 'core' index temporarily unavailable (HTTP 503) while the
+    'lite' index serves normally. We retry core with backoff first and only
+    then degrade to lite — never silently returning partial bibliographic
+    depth without logging it.
+    """
+    try:
+        resp = http_get_with_backoff(EUROPE_PMC_ENDPOINT, params)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as exc:  # transport failure after retries
+        log(f"Europe PMC request error: {exc}")
+
+    degraded = dict(params)
+    degraded["resultType"] = "lite"          # abstracts may be absent
+    degraded.pop("sort", None)               # sort unsupported on lite index
+    log("Europe PMC 'core' index unavailable (503); degrading to 'lite' "
+        "index (abstract completeness filter will trim accordingly).")
+    try:
+        resp = http_get_with_backoff(EUROPE_PMC_ENDPOINT, degraded)
+        if resp.status_code == 200:
+            return resp.json()
+        raise RuntimeError(f"Europe PMC HTTP {resp.status_code}")
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Europe PMC unreachable: {exc}")
+
+
+def epmc_abstract_fill(pmids: list[str]) -> dict[str, str]:
+    """Batch-fetch abstract text for lite-mode records via the EPMC
+    articleformatting endpoint (POST, <=1000 ids/request). Keeps the
+    fallback path ALCOA+'Complete': lite metadata + authoritative abstracts."""
+    out: dict[str, str] = {}
+    if not pmids:
+        return out
+    url = "https://www.ebi.ac.uk/europepmc/webservices/rest/articleformatting"
+    for i in range(0, len(pmids), 250):
+        batch = pmids[i:i + 250]
+        try:
+            resp = http_post_json_with_backoff(
+                url, json_data={"pmid": batch},
+                params={"textMentions": "false", "fullTextElements": "false"})
+            if resp.status_code != 200:
+                log(f"EPMC abstract fill HTTP {resp.status_code}; continuing "
+                    "without abstract enrichment.")
+                continue
+            data = resp.json()
+            item_list = data.get("itemList", [])
+            if isinstance(item_list, dict):
+                item_list = [item_list]
+            for item in item_list:
+                pid = str(item.get("id", ""))
+                body = item.get("body", "") or ""
+                if pid and body:
+                    out[pid] = clean_abstract_text(body)
+        except Exception as exc:
+            log(f"EPMC abstract fill failed ({exc}); continuing.")
+        polite_sleep()
+    return out
+
+
 def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     """Europe PMC /webservices/rest/search, format=json, pageSize=25,
     cursorMark deep pagination. Used after repeated Entrez failures or when
@@ -284,10 +432,9 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
             "resultType": "core",
             "sort": "P_PUB_DATE_DESC",
         }
-        resp = http_get_with_backoff(EUROPE_PMC_ENDPOINT, params)
-        if resp.status_code != 200:
-            raise RuntimeError(f"Europe PMC HTTP {resp.status_code}")
-        payload = resp.json()
+        payload = _epmc_page(params)
+        if payload is None:
+            break
         result_list = payload.get("resultList", {}).get("result", [])
         if not result_list:
             break
@@ -324,6 +471,18 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
             break
         cursor = next_cursor
         polite_sleep()
+
+    # Lite-mode degradation: batch-fill missing abstracts so the QC filter
+    # ("drop empty abstract") is not starved by index availability.
+    missing = [r["pmid"] for r in records
+               if r["pmid"].isdigit() and not r["abstract"]]
+    if missing:
+        log(f"Enriching {len(missing)} record(s) lacking abstract text "
+            "(EPMC articleformatting batch endpoint).")
+        filled = epmc_abstract_fill(missing)
+        for r in records:
+            if not r["abstract"] and r["pmid"] in filled:
+                r["abstract"] = filled[r["pmid"]]
     return records, 0
 
 
