@@ -115,31 +115,6 @@ def http_get_with_backoff(url: str, params: dict | None = None) -> requests.Resp
     raise RuntimeError(f"GET failed after {MAX_RETRIES} retries: {last_exc}")
 
 
-def http_post_json_with_backoff(url: str, json_data: dict,
-                                params: dict | None = None) -> requests.Response:
-    """POST JSON with the same exponential-backoff policy as GET."""
-    last_exc: Exception | None = None
-    for attempt in range(MAX_RETRIES + 1):
-        try:
-            resp = requests.post(url, json=json_data, params=params, timeout=30,
-                                 headers={"User-Agent": DEFAULT_ENTREZ_TOOL})
-            if resp.status_code in (503, 429) and attempt < MAX_RETRIES:
-                wait = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
-                log(f"HTTP {resp.status_code}; backing off {wait}s "
-                    f"(retry {attempt + 1}/{MAX_RETRIES})")
-                time.sleep(wait)
-                continue
-            return resp
-        except (requests.ConnectionError, requests.Timeout,
-                urllib.error.URLError) as exc:
-            last_exc = exc
-            if attempt < MAX_RETRIES:
-                wait = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
-                log(f"Network error ({type(exc).__name__}); backing off {wait}s")
-                time.sleep(wait)
-    raise RuntimeError(f"POST failed after {MAX_RETRIES} retries: {last_exc}")
-
-
 # ---------------------------------------------------------------------------
 # Abstract text hygiene — BeautifulSoup used ONLY for markup stripping.
 # ---------------------------------------------------------------------------
@@ -147,11 +122,19 @@ def clean_abstract_text(raw: str | None) -> str:
     """Strip any embedded markup/entities and normalise to a single line."""
     if not raw:
         return ""
-    try:
-        from bs4 import BeautifulSoup  # markup-stripping helper only
-        text = BeautifulSoup(raw.replace("\n", " "), "html.parser").get_text(" ")
-    except Exception:
-        text = raw
+    text = raw.replace("\n", " ")
+    # Only invoke BeautifulSoup when the text actually looks like markup —
+    # feeding it plain prose/filenames triggers bs4's
+    # MarkupResemblesLocatorWarning noise for zero benefit.
+    if "<" in text and ">" in text:
+        try:
+            import warnings
+            from bs4 import BeautifulSoup  # markup-stripping helper only
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                text = BeautifulSoup(text, "html.parser").get_text(" ")
+        except Exception:
+            pass
     text = re.sub(r"<[^>]+>", " ", text)          # belt-and-braces tag strip
     text = text.replace("&#39;", "'").replace("&amp;", "&").replace("&quot;", '"')
     return re.sub(r"\s+", " ", text).strip()
@@ -178,19 +161,31 @@ def format_authors(names: list[tuple[str, str]]) -> str:
     return out
 
 
-def extract_doi(article_el) -> str:
-    """DOI from ArticleIdList or ELocationDistribution (Entrez XML element)."""
-    try:
-        for aidlist in article_el.find("AuthorInformation").iter() if False else []:
-            pass
-    except Exception:
-        pass
-    return ""
-
-
 # ---------------------------------------------------------------------------
 # Primary source: NCBI E-utilities via Bio.Entrez
 # ---------------------------------------------------------------------------
+def _entrez_call_with_backoff(fn, *args, **kwargs):
+    """Wrap a Bio.Entrez call with exponential backoff (2/4/8 s) on HTTP
+    503/429 or transport errors — the same resilience policy the HTTP helpers
+    use, so the module's documented retry behaviour applies to BOTH sources
+    (previously the Entrez phase had no retries at all)."""
+    last_err = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as err:
+            status = getattr(err, "code", None)
+            transient = status in (503, 429) or status is None
+            last_err = err
+            if attempt >= MAX_RETRIES or not transient:
+                break
+            wait = BACKOFF_SECONDS[min(attempt, len(BACKOFF_SECONDS) - 1)]
+            log(f"Entrez {fn.__name__} failed (status={status or err}); "
+                f"backing off {wait}s (retry {attempt + 1}/{MAX_RETRIES})")
+            time.sleep(wait)
+    raise RuntimeError(f"Entrez {getattr(fn, '__name__', 'call')} failed: {last_err}")
+
+
 def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     """esearch (db=pubmed, sort=date) + efetch (rettype=abstract, retmode=xml).
 
@@ -216,7 +211,8 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     retmax = min(max_records * 2, 500)  # over-fetch: dedup/filter will trim
 
     # --- esearch -----------------------------------------------------------
-    handle = Entrez.esearch(db="pubmed", term=query, retmax=retmax, sort="date")
+    handle = _entrez_call_with_backoff(
+        Entrez.esearch, db="pubmed", term=query, retmax=retmax, sort="date")
     search = Entrez.read(handle)
     handle.close()
     id_list = search.get("IdList", [])
@@ -228,8 +224,9 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
     batch = 50
     for i in range(0, len(id_list), batch):
         chunk = id_list[i:i + batch]
-        handle = Entrez.efetch(db="pubmed", id=",".join(chunk),
-                               rettype="abstract", retmode="xml")
+        handle = _entrez_call_with_backoff(
+            Entrez.efetch, db="pubmed", id=",".join(chunk),
+            rettype="abstract", retmode="xml")
         raw = handle.read()
         handle.close()
         if isinstance(raw, str):
@@ -324,18 +321,29 @@ def _parse_pubmed_article(article_el) -> dict | None:
         pass
 
     doi = ""
-    for aid in article.get("ArticleIdList", []):
-        if str(aid).lower().startswith("10."):
-            doi = str(aid)
+    # DOIs live in PubmedData/ArticleIdList (@IdType="doi") — NOT under
+    # Article — with a secondary copy as Article/ELocationID (@EIdType="doi").
+    # Entrez parses these as StringElements carrying their XML attributes in
+    # an `.attributes` dict; the previous implementation looked in the wrong
+    # subtree and read the attribute from the wrong place, so the DOI column
+    # came out empty for 100% of records.
+    pubmed_data = article_el.get("PubmedData", {}) if hasattr(article_el, "get") else {}
+    for aid in pubmed_data.get("ArticleIdList", []):
+        attrs = getattr(aid, "attributes", {}) or {}
+        if str(attrs.get("IdType", "")).lower() == "doi":
+            doi = str(aid).strip()
             break
+        if not doi and str(aid).strip().lower().startswith("10."):
+            doi = str(aid).strip()
     if not doi:
-        try:
-            for eloc in article.get("ELocationID", []):
-                if getattr(eloc, "EIdType", "") == "doi":
-                    doi = str(eloc)
-                    break
-        except Exception:
-            pass
+        eloc = article.get("ELocationID", [])
+        if not isinstance(eloc, list):
+            eloc = [eloc]                    # single element parses as scalar
+        for e in eloc:
+            attrs = getattr(e, "attributes", {}) or {}
+            if str(attrs.get("EIdType", "")).lower() == "doi":
+                doi = str(e).strip()
+                break
 
     abstract_parts = []
     for ab in article.get("Abstract", {}).get("AbstractText", []):
@@ -384,32 +392,38 @@ def _epmc_page(params: dict) -> dict | None:
 
 
 def epmc_abstract_fill(pmids: list[str]) -> dict[str, str]:
-    """Batch-fetch abstract text for lite-mode records via the EPMC
-    articleformatting endpoint (POST, <=1000 ids/request). Keeps the
-    fallback path ALCOA+'Complete': lite metadata + authoritative abstracts."""
+    """Batch-fetch abstract text for lite-mode records via batched /search
+    queries keyed on `(ext_id:PMID AND src:med)`, resultType=core.
+
+    The previous implementation POSTed to a `/articleformatting` endpoint that
+    does not exist in the Europe PMC REST API (every call returned HTTP 404),
+    which starved the QC filter and made the whole fallback path exit 1 with
+    zero outputs. The search-based fill below is verified against the live
+    API. Keeps the fallback path ALCOA+ 'Complete': lite metadata +
+    authoritative abstracts."""
     out: dict[str, str] = {}
     if not pmids:
         return out
-    url = "https://www.ebi.ac.uk/europepmc/webservices/rest/articleformatting"
-    for i in range(0, len(pmids), 250):
-        batch = pmids[i:i + 250]
+    batch_size = 20  # keep the query string well within URL limits
+    for i in range(0, len(pmids), batch_size):
+        batch = [p for p in pmids[i:i + batch_size] if p.isdigit()]
+        if not batch:
+            continue
+        query = " OR ".join(f"(ext_id:{p} AND src:med)" for p in batch)
         try:
-            resp = http_post_json_with_backoff(
-                url, json_data={"pmid": batch},
-                params={"textMentions": "false", "fullTextElements": "false"})
+            resp = http_get_with_backoff(
+                EUROPE_PMC_ENDPOINT,
+                {"query": query, "format": "json",
+                 "pageSize": len(batch), "resultType": "core"})
             if resp.status_code != 200:
                 log(f"EPMC abstract fill HTTP {resp.status_code}; continuing "
-                    "without abstract enrichment.")
+                    "without abstract enrichment for this batch.")
                 continue
-            data = resp.json()
-            item_list = data.get("itemList", [])
-            if isinstance(item_list, dict):
-                item_list = [item_list]
-            for item in item_list:
-                pid = str(item.get("id", ""))
-                body = item.get("body", "") or ""
-                if pid and body:
-                    out[pid] = clean_abstract_text(body)
+            for item in resp.json().get("resultList", {}).get("result", []):
+                pid = str(item.get("pmid", "") or "")
+                abstract = clean_abstract_text(item.get("abstractText"))
+                if pid and abstract:
+                    out[pid] = abstract
         except Exception as exc:
             log(f"EPMC abstract fill failed ({exc}); continuing.")
         polite_sleep()
@@ -430,7 +444,13 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
             "pageSize": EPMC_PAGE_SIZE,
             "cursorMark": cursor,
             "resultType": "core",
-            "sort": "P_PUB_DATE_DESC",
+            # "P_PDATE_D desc" = first-publication-date descending. The former
+            # value "P_PUB_DATE_DESC" is NOT a valid EPMC sort token — the
+            # server answered every such request with HTTP 503, which the old
+            # code misdiagnosed as a "core index outage" and degraded to lite
+            # (losing all abstracts). Verified live: core + this sort +
+            # cursorMark returns 200 with full abstractText.
+            "sort": "P_PDATE_D desc",
         }
         payload = _epmc_page(params)
         if payload is None:
@@ -478,7 +498,7 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
                if r["pmid"].isdigit() and not r["abstract"]]
     if missing:
         log(f"Enriching {len(missing)} record(s) lacking abstract text "
-            "(EPMC articleformatting batch endpoint).")
+            "(EPMC batched ext_id search, resultType=core).")
         filled = epmc_abstract_fill(missing)
         for r in records:
             if not r["abstract"] and r["pmid"] in filled:

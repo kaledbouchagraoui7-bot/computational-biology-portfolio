@@ -106,7 +106,12 @@ def gc_content(seq: str) -> float:
     return round(100.0 * (g + c) / effective, 2) if effective else 0.0
 
 
-_COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+# Full IUPAC ambiguity-code complement map (partial maps silently corrupt
+# reverse complements of soft-masked / partially resolved records).
+_COMPLEMENT = str.maketrans(
+    "ACGTRYKMSWBVDHNacgtrykmswbvdhn",
+    "TGCAYRMKSWVBHDNtgcayrmkswvbhdn",
+)
 
 
 def reverse_complement(seq: str) -> str:
@@ -143,59 +148,23 @@ def translate_orf(nt: str) -> str:
 
 
 def longest_orf(seq: str) -> dict:
-    """Longest Open Reading Frame across all six reading frames (three sense
-    frames of the given strand plus the three of its complement), each scanned
-    as ATG -> first in-frame stop (TAA/TAG/TGA).
+    """Longest Open Reading Frame on BOTH strands (three sense frames of the
+    given strand plus the three of its reverse complement), each scanned as
+    ATG -> first in-frame stop (TAA/TAG/TGA).
 
     Returns start/end coordinates mapped onto the supplied 5'->3' transcript,
-    the ORF length, and the predicted protein length (stop excluded).
+    the ORF length, the strand (+1 forward / -1 reverse complement), and the
+    predicted protein length (stop excluded). Callers must reverse-complement
+    the forward-coordinate slice before translating a strand=-1 ORF.
     Identifying the candidate CDS is exactly what clinical variant reports
     annotate against, so this metric bridges raw sequence retrieval and
     dossier-grade annotation.
     """
     s = seq.upper()
-    best = {"start": None, "end": None, "length_nt": 0, "protein_length_aa": 0}
+    best = {"start": None, "end": None, "length_nt": 0,
+            "protein_length_aa": 0, "strand": 1}
 
-    def scan(strand_seq: str, is_forward: bool) -> None:
-        nonlocal best
-        n = len(strand_seq)
-        i = 0
-        while i + 3 <= n:
-            if strand_seq[i:i + 3] == "ATG":
-                j = i
-                found_stop = False
-                while j + 3 <= n:
-                    if strand_seq[j:j + 3] in ("TAA", "TAG", "TGA"):
-                        orf_len = j + 3 - i
-                        if orf_len > best["length_nt"]:
-                            if is_forward:
-                                start, end = i + 1, j + 3   # 1-based inclusive
-                            else:
-                                # map minus-strand coords back onto the
-                                # original 5'->3' transcript orientation
-                                start, end = n - (j + 3) + 1, n - i
-                            best = {"start": start, "end": end,
-                                    "length_nt": orf_len,
-                                    "protein_length_aa": orf_len // 3 - 1}
-                        found_stop = True
-                        break
-                    j += 3
-                # continue scanning after the ORF (or after the open ATG run)
-                i = (j + 3) if found_stop else (j if j > i else i + 3)
-                # re-seek the next ATG from there
-                nxt = strand_seq.find("ATG", i)
-                if nxt == -1:
-                    break
-                # ensure frame continuity is irrelevant for exhaustive ORF
-                # hunting: we rescan from every subsequent ATG position
-                i = nxt
-            else:
-                nxt = strand_seq.find("ATG", i + 1)
-                if nxt == -1:
-                    break
-                i = nxt
-
-    # Exhaustive alternative: iterate every ATG offset on both strands.
+    # Exhaustive scan: iterate every ATG offset on the given strand.
     def scan_all_atgs(strand_seq: str, is_forward: bool) -> None:
         nonlocal best
         n = len(strand_seq)
@@ -209,17 +178,19 @@ def longest_orf(seq: str) -> dict:
                         if is_forward:
                             start, end = pos + 1, j + 3
                         else:
+                            # map minus-strand coords back onto the
+                            # original 5'->3' transcript orientation
                             start, end = n - (j + 3) + 1, n - pos
                         best = {"start": start, "end": end,
                                 "length_nt": orf_len,
-                                "protein_length_aa": orf_len // 3 - 1}
+                                "protein_length_aa": orf_len // 3 - 1,
+                                "strand": 1 if is_forward else -1}
                     break
                 j += 3
             pos = strand_seq.find("ATG", pos + 1)
 
     scan_all_atgs(s, is_forward=True)
     scan_all_atgs(reverse_complement(s), is_forward=False)
-    _ = scan  # kept for documentation of the frame-based approach
     return best
 
 
@@ -240,6 +211,16 @@ def _as_bytes(data) -> bytes:
     return bytes(data)
 
 
+def _looks_like_block_page(data: bytes) -> bool:
+    """NCBI answers rate-limit/IP blocks with an HTML 'WWW Error Blocked
+    Diagnostic' page (HTTP 200!). Feeding that to the XML/FASTA parsers yields
+    cryptic 'mismatched tag' errors; detecting it here turns the block into a
+    retryable transport failure instead."""
+    head = data.lstrip()[:512].lower()
+    return (head.startswith(b"<!doctype html") or head.startswith(b"<html")
+            or b"www error blocked" in head)
+
+
 def _entrez_request(fn, *args, **kwargs):
     """Wrap an Entrez call with exponential backoff (2/4/8 s) and 3 retries on
     HTTP 503/429 or connection errors. NCBI throttles above 3 req/s; respecting
@@ -254,20 +235,20 @@ def _entrez_request(fn, *args, **kwargs):
                     result.close()
             except Exception:
                 pass
+            if _looks_like_block_page(data):
+                raise RuntimeError("NCBI returned an HTML block/throttle page "
+                                   "(rate limit); treating as transient")
             time.sleep(NCBI_SLEEP)  # courtesy pacing (< 3 req/s)
             return data
-        except OSError as err:  # urllib.error.HTTPError subclasses OSError
+        except Exception as err:  # OSError covers urllib HTTPError (503/429)
             status = getattr(err, "code", None)
             last_err = err
+            if attempt == MAX_RETRIES - 1:
+                break  # no point sleeping after the final attempt
             wait = BACKOFF_BASE * (2 ** attempt)  # 2, 4, 8 seconds
-            print(f"[warn] NCBI request failed (status={status or err}); "
+            kind = "HTTP status" if status else "error"
+            print(f"[warn] NCBI request failed ({kind}={status or err}); "
                   f"retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES})")
-            time.sleep(wait)
-        except Exception as err:
-            last_err = err
-            wait = BACKOFF_BASE * (2 ** attempt)
-            print(f"[warn] NCBI error ({err}); retrying in {wait}s "
-                  f"(attempt {attempt + 1}/{MAX_RETRIES})")
             time.sleep(wait)
     raise RuntimeError(f"NCBI request failed after {MAX_RETRIES} attempts: {last_err}")
 
@@ -306,6 +287,16 @@ def fetch_records(email: str, tool: str) -> list:
             records = list(SeqIO.parse(
                 io.StringIO(_clean_fasta(fasta.decode("utf-8", "replace"))),
                 "fasta"))[:5]
+            # Apply the title-verification gate IMMEDIATELY: esearch's "Gene
+            # Name" index also matches legacy records from unrelated genes, and
+            # leaving them in `records` would make the panel look complete (5/5)
+            # and suppress the curated fallback — shipping a short deliverable.
+            before = len(records)
+            records = [r for r in records if _is_cftr_record(r)]
+            if before != len(records):
+                print(f"[info] dropped {before - len(records)} non-CFTR "
+                      "record(s) from the esearch result at the title-"
+                      "verification gate.")
     except Exception as err:
         print(f"[info] esearch/efetch primary path unavailable ({err}); "
               "using curated-accession fallback chain.")
@@ -343,12 +334,17 @@ def fetch_records(email: str, tool: str) -> list:
             try:
                 fasta = _entrez_request(Entrez.efetch, db="nuccore", id=acc,
                                         rettype="fasta", retmode="text")
+                got = 0
                 for rec in SeqIO.parse(io.StringIO(
                         _clean_fasta(fasta.decode("utf-8", "replace"))), "fasta"):
                     base = rec.id.split(".")[0]
                     if base not in have and len(records) < 5:
                         records.append(rec)
                         have.add(base)
+                        got += 1
+                if not got:
+                    print(f"[warn] efetch for {acc} returned no parseable "
+                          "FASTA record (possible NCBI throttle page).")
             except Exception as err:
                 print(f"[warn] single-record fetch failed for {acc}: {err}")
 
@@ -388,7 +384,17 @@ def _is_cftr_record(rec) -> bool:
 
 def analyze(records: list) -> tuple[list, str]:
     """Build one summary row per record (versioned accession retained in EVERY
-    row for record-level traceability) and run the MANE cross-check gate."""
+    row for record-level traceability) and run the MANE cross-check gate.
+
+    Rows are emitted in canonical curated-panel order (MANE Select first),
+    so the CSV is byte-stable regardless of which retrieval path (esearch or
+    curated fallback) supplied each record — reproducibility by construction.
+    """
+    curated_order = {a.upper(): i for i, a in enumerate(CURATED_CFTR_MRNAs)}
+    records = sorted(records,
+                     key=lambda r: (curated_order.get(r.id.split(".")[0].upper(),
+                                                      len(CURATED_CFTR_MRNAs)),
+                                    r.id))
     rows: list = []
     crosscheck = "REVIEW"
     mane_seen = False
@@ -396,8 +402,15 @@ def analyze(records: list) -> tuple[list, str]:
         seq = str(rec.seq)
         acc_version = rec.id if "." in rec.id else rec.id + ".1"
         orf = longest_orf(seq)
-        protein = translate_orf(seq[orf["start"] - 1:orf["end"]]) \
-            if orf["start"] else ""
+        protein = ""
+        if orf["start"]:
+            sub = seq[orf["start"] - 1:orf["end"]]
+            if orf.get("strand", 1) == -1:
+                # minus-strand ORF: translate the reverse complement of the
+                # forward-coordinate slice (translating the forward slice
+                # directly would yield garbage and fail the M.../* check)
+                sub = reverse_complement(sub)
+            protein = translate_orf(sub)
         row = {
             "accession": acc_version.split(".")[0],
             "version": acc_version,

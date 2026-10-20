@@ -166,33 +166,43 @@ def welch_ttest(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
 
 def _chi2_sf(x: float, k: int) -> float:
     """Upper tail of chi-square via the regularised gamma function Q(k/2, x/2)
-    (series/continued-fraction split, Numerical Recipes §6.2)."""
+    (series/continued-fraction split, Numerical Recipes §6.2 gser/gcf)."""
     if x <= 0:
         return 1.0
     a, xx = k / 2.0, x / 2.0
+    FPMIN = 1e-300
+    ln_pre = -xx + a * math.log(xx) - math.lgamma(a)
     if xx < a + 1.0:                      # series for P(a, x)
-        term = ap = 1.0 / a
-        total = term
-        for _ in range(300):
+        ap = a                            # NOTE: ap must start at a (not 1/a)
+        term = total = 1.0 / a
+        for _ in range(1000):
             ap += 1.0
             term *= xx / ap
             total += term
             if abs(term) < abs(total) * 3e-12:
                 break
-        p = total * math.exp(-xx + a * math.log(xx) - math.lgamma(a))
-        return 1.0 - p
-    c, d = 1.0, 1.0 / (xx + 1.0 - a)      # continued fraction for Q(a, x)
+        return 1.0 - total * math.exp(ln_pre)
+    # modified Lentz continued fraction for Q(a, x); per NR, c must start at
+    # 1/FPMIN (starting at 1.0 corrupts the first iteration)
+    b = xx + 1.0 - a
+    c = 1.0 / FPMIN
+    d = 1.0 / b
     h = d
-    for i in range(1, 300):
+    for i in range(1, 1000):
         an = -i * (i - a)
-        xx2 = xx + 2.0 * i + 1.0
-        d = 1.0 / (an * d + xx2) if abs(an * d + xx2) > 1e-300 else 1e300
-        c = xx2 + an / c if abs(c) > 1e-300 else 1e300
+        b += 2.0
+        d = an * d + b
+        if abs(d) < FPMIN:
+            d = FPMIN
+        c = b + an / c
+        if abs(c) < FPMIN:
+            c = FPMIN
+        d = 1.0 / d
         delta = d * c
         h *= delta
         if abs(delta - 1.0) < 3e-12:
             break
-    return h * math.exp(-xx + a * math.log(xx) - math.lgamma(a))
+    return h * math.exp(ln_pre)
 
 
 def chi_square_test(table: np.ndarray) -> tuple[float, int, float]:
@@ -233,8 +243,18 @@ def generate_raw_cohort(seed: int) -> pd.DataFrame:
     base = rng.normal(58.0, 12.0, n)
     biomarker = np.where(arm == "Treatment", base - 4.5, base)
 
+    # Draw the injected duplicate IDs WITHOUT replacement. A plain
+    # rng.choice(..., N_DUPLICATES) can pick the same ID twice, which would
+    # leave only 99 unique subjects after de-duplication and trip the n=100
+    # assertion for unlucky seeds. Redrawing on collision keeps the default
+    # seed=2027 stream (and therefore all committed outputs) byte-identical —
+    # this draw MUST stay at this exact position in the RNG consumption order.
+    dup_ids = list(rng.choice(patient_id, N_DUPLICATES))
+    while len(set(dup_ids)) < N_DUPLICATES:
+        dup_ids = list(rng.choice(patient_id, N_DUPLICATES))
+
     df = pd.DataFrame({
-        "Patient_ID": patient_id + list(rng.choice(patient_id, N_DUPLICATES)),
+        "Patient_ID": patient_id + dup_ids,
         "Age": age, "Sex": sex, "BMI": bmi,
         "Treatment_Arm": arm, "Adverse_Event_Severity": ae,
         "Biomarker_Level": np.round(biomarker, 2),
@@ -289,15 +309,15 @@ def clean_cohort(raw: pd.DataFrame) -> pd.DataFrame:
 
     # Rule 3 — implausible-range rejection (hard protocol boundaries). Cells
     # outside pre-specified validity ranges are set to NaN and counted, never
-    # quietly edited (data-integrity expectation); the affected SUBJECT is then
-    # excluded from the analysis population only if the violation cannot be
-    # resolved by Rule-4 imputation. In this synthetic design exactly 3 records
-    # carry one hard-violation cell each (Age=9.4 pediatric outlier, BMI=121
-    # unit error, Biomarker=-40 negative assay value) plus 3 missing cells;
-    # after dedup (103->100) the cleaned population is n=100 with all three
-    # injected duplicates removed first. Violations here are handled as
-    # query-and-resolve: out-of-range CELLS become missing, then arm-stratified
-    # median imputation restores a complete-case dataset of n=100 subjects.
+    # quietly edited (data-integrity expectation). Violations are handled as
+    # query-and-resolve: out-of-range CELLS become missing, then Rule-4
+    # arm-stratified median imputation restores a complete-case dataset.
+    # In the seeded raw extract this catches the deliberately injected hard
+    # violations (Age=9.4 pediatric outlier, BMI=121 unit error) plus any
+    # naturally implausible draws from the seeded RNG; the injected missing
+    # cells (Age, BMI, Biomarker_Level) flow straight through to Rule 4.
+    # Exact counts are reported by the audit line below — they are a function
+    # of the seed and are never hard-coded here.
     for col in ("Age", "BMI", "Biomarker_Level"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     lo_hi = {"Age": AGE_RANGE, "BMI": BMI_RANGE,
@@ -359,17 +379,13 @@ def table1(df: pd.DataFrame) -> pd.DataFrame:
         tab = np.array([[int((placebo[col] == c).sum()), int((trt[col] == c).sum())]
                         for c in cats])
         _, _, p = chi_square_test(tab)
-        first = True
         for i, c in enumerate(cats):
-            rows.append({"Characteristic": (label if first else f"    {c}"),
-                         "Placebo": ("" if not first else "") +
-                                    (f"{tab[i, 0]} ({100 * tab[i, 0] / len(placebo):.1f}%)"
-                                     if first or True else ""),
-                         "Treatment": f"{tab[i, 1]} ({100 * tab[i, 1] / len(trt):.1f}%)",
-                         "p-value": f"{p:.4f}" if first else ""})
-            if first:
-                rows[-1]["Characteristic"] = f"{label} — {c}"
-                first = False
+            first = i == 0
+            rows.append({
+                "Characteristic": f"{label} — {c}" if first else f"    {c}",
+                "Placebo": f"{tab[i, 0]} ({100 * tab[i, 0] / len(placebo):.1f}%)",
+                "Treatment": f"{tab[i, 1]} ({100 * tab[i, 1] / len(trt):.1f}%)",
+                "p-value": f"{p:.4f}" if first else ""})
     return pd.DataFrame(rows)
 
 
@@ -377,10 +393,15 @@ def table1(df: pd.DataFrame) -> pd.DataFrame:
 # Figure 1 — biomarker distribution by arm (raw-data transparency overlay)
 # ---------------------------------------------------------------------------
 
-def make_figure(df: pd.DataFrame, png_path: str) -> None:
+def make_figure(df: pd.DataFrame, png_path: str, seed: int = SEED_DEFAULT) -> None:
     """Boxplot with jittered raw observations and group-mean markers: showing
     the FULL dataset behind the summary boxes is a data-transparency practice
     aligned with good visual-reporting standards for dossier appendices."""
+    # seaborn's stripplot jitter draws from the LEGACY global numpy RNG, which
+    # the seeded default_rng() cohort generator does not touch — without this
+    # reseed the figure differs on every run, breaking the byte-reproducibility
+    # claim (data was always deterministic; only the jitter was not).
+    np.random.seed(seed)
     sns.set_theme(style="whitegrid", context="talk")
     fig, ax = plt.subplots(figsize=(9, 6))
     palette = {"Placebo": "#4C72B0", "Treatment": "#DD8452"}
@@ -411,7 +432,17 @@ def make_figure(df: pd.DataFrame, png_path: str) -> None:
 def emit_notebook(py_source: str, nb_path: str) -> None:
     """Write 02_clinical_trial_eda.ipynb: markdown narrative cells + one code
     cell that embeds this module verbatim and runs main([]). Single source of
-    truth => notebook and script can never drift apart (reproducibility)."""
+    truth => notebook and script can never drift apart (reproducibility).
+
+    IMPORTANT: the script's own `if __name__ == "__main__": sys.exit(main())`
+    guard MUST be stripped from the embedded source. Inside a notebook
+    __name__ == "__main__" is also true, so the guard would fire main() with
+    the Jupyter kernel's sys.argv (e.g. ['-f', 'kernel-1234.json']) and die
+    with "unrecognized arguments" before the notebook-safe main([]) below ever
+    runs — i.e. the emitted notebook would crash on Colab at the first run.
+    """
+    guard = 'if __name__ == "__main__":\n    sys.exit(main())'
+    embedded = py_source.replace(guard, "").rstrip() + "\n"
     md_intro = (
         "# Project 2 — Clinical Trial EDA & Regulatory Table 1\n\n"
         "**Author:** Kaled Bouchagraoui · **Stack:** pandas / numpy / seaborn "
@@ -438,7 +469,10 @@ def emit_notebook(py_source: str, nb_path: str) -> None:
             {"cell_type": "markdown", "metadata": {}, "source": [md_intro]},
             {"cell_type": "code", "execution_count": None, "metadata": {},
              "outputs": [],
-             "source": [py_source, "\n\nif __name__ == '__main__':\n    sys.exit(main([]))\n"]},
+             "source": [embedded,
+                        "\n\n# Notebook entry point: explicit empty argv (a bare main()\n"
+                        "# would parse the Jupyter kernel's connection-file arguments).\n"
+                        "main([])\n"]},
         ],
     }
     with open(nb_path, "w", encoding="utf-8") as fh:
@@ -459,6 +493,8 @@ def main(argv=None) -> int:
                         help="RNG seed for byte-reproducible synthetic data")
     parser.add_argument("--png", default="table1_demographics.png",
                         help="Output figure path")
+    parser.add_argument("--csv", default="cleaned_cohort.csv",
+                        help="Cleaned analysis population CSV path")
     parser.add_argument("--notebook", default="02_clinical_trial_eda.ipynb",
                         help="Output notebook path")
     args = parser.parse_args(argv)
@@ -482,7 +518,7 @@ def main(argv=None) -> int:
     for entry in CLEANING_LOG:
         print(f"  • {entry}")
 
-    make_figure(df, args.png)
+    make_figure(df, args.png, seed=args.seed)
     here = __file__ if "__file__" in globals() else "02_clinical_trial_eda.py"
     try:
         with open(here, "r", encoding="utf-8") as fh:
@@ -491,8 +527,8 @@ def main(argv=None) -> int:
         print(f"[warn] Could not read source for notebook emission: {err}")
 
     # Persist the cleaned analysis population alongside outputs (traceability).
-    df.to_csv("cleaned_cohort.csv", index=False)
-    print(f"Wrote cleaned analysis population -> cleaned_cohort.csv (n={len(df)})")
+    df.to_csv(args.csv, index=False)
+    print(f"Wrote cleaned analysis population -> {args.csv} (n={len(df)})")
     return 0
 
 

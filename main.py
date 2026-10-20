@@ -155,10 +155,12 @@ def academics_log(
             f"< [bold]{KILL_SWITCH_THRESHOLD}[/bold]"
             for s in triggered
         )
+        # NOTE: Text.assemble() does NOT parse [bold]-style markup — the detail
+        # lines must go through Text.from_markup() or the tags print literally.
         body = Text.assemble(
             ("ACADEMIC KILL SWITCH TRIGGERED\n\n", "bold white"),
             ("Pause all side projects. Redirect 100% bandwidth to core subjects.\n\n", "bold white"),
-            (detail, "bold yellow"),
+            Text.from_markup(detail, style="bold yellow"),
         )
         console.print(Panel(body, title="☠ KILL SWITCH ☠",
                             border_style="red", style="red", padding=(1, 2)))
@@ -208,17 +210,24 @@ def academics_list(limit: int = typer.Option(20, "--limit", "-l")):
 # ===================================================================== RUN ==
 def parse_time_to_seconds(raw: str) -> Optional[float]:
     """
-    Accept '1m23s', '1:23', '83', '1m23s+500ms', '90s', '2m'.
+    Accept '1m23s', '1:23', '83', '1m23s+500ms', '90s', '2m', '1\'23"', '1′23″'.
     Rules:
       * 'Xm Ys (+Zms)'  → minutes + seconds + milliseconds
       * 'H:MM:SS' / 'MM:SS' → clock notation
-      * trailing 's'     → plain seconds
+      * "X'Y\"" / X′Y″   → prime/double-prime (feet-style) notation
+      * trailing 's' or '"' → plain seconds
       * trailing 'm/min' → minutes
       * bare number      → plain seconds (unambiguous for track use).
     """
-    t = raw.strip().lower().replace("″", '"').replace("'", "")
+    t = raw.strip().lower().replace("′", "'").replace("″", '"')
     if not t:
         return None
+
+    # prime notation: 1'23", 1'23, 83"
+    m_prime = re.fullmatch(r"(?:(\d+(?:\.\d+)?)\s*'\s*)?(\d+(?:\.\d+)?)\s*\"?", t)
+    if m_prime and ("'" in t or '"' in t):
+        minutes = float(m_prime.group(1)) if m_prime.group(1) else 0.0
+        return minutes * 60 + float(m_prime.group(2))
 
     # clock notation 1:23 or 1:02:03
     if ":" in t:
@@ -265,6 +274,26 @@ def fmt_hms(total_seconds: float) -> str:
     return (f"{h}:{mins:02d}:{secs:05.2f}" if h else f"{mins}:{secs:05.2f}")
 
 
+MI_M = 1609.344
+KM_M = 1000.0
+
+
+def parse_distance_meters(raw: str) -> Optional[float]:
+    """Accept '500', '500m', '1.5km', '1mi' -> meters (module-level so the
+    web interface can reuse the exact same parser as the CLI)."""
+    t = raw.strip().lower()
+    try:
+        if t.endswith("mi"):
+            return float(t[:-2]) * MI_M
+        if t.endswith("km"):
+            return float(t[:-2]) * KM_M
+        if t.endswith("m"):
+            return float(t[:-1])
+        return float(t)  # bare number => meters
+    except ValueError:
+        return None
+
+
 @run_app.command("pace")
 def run_pace(
     distance: Optional[str] = typer.Argument(None, help="Target distance, e.g. 500 or 500m or 1mi"),
@@ -276,21 +305,7 @@ def run_pace(
     """Compute required pace per 100m & km/h, then print the Asthma Protocol."""
     console.print(_banner("PACE ENGINE // ASTHMA-AWARE PROTOCOL"))
 
-    MI_M = 1609.344
-    KM_M = 1000.0
-
-    def parse_distance(raw: str) -> Optional[float]:
-        t = raw.strip().lower()
-        try:
-            if t.endswith("mi"):
-                return float(t[:-2]) * MI_M
-            if t.endswith("km"):
-                return float(t[:-2]) * KM_M
-            if t.endswith("m"):
-                return float(t[:-1])
-            return float(t)  # bare number => meters
-        except ValueError:
-            return None
+    parse_distance = parse_distance_meters
 
     while distance is None or (dist_m := parse_distance(distance)) is None or dist_m <= 0:
         if distance is not None:

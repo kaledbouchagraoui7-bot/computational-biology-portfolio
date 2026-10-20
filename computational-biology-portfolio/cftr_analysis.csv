@@ -1,6 +1,6 @@
 accession,version,description,length_nt,gc_percent,longest_orf_start,longest_orf_end,longest_orf_length_nt,predicted_protein_length_aa
 NM_000492,NM_000492.4,"NM_000492.4 Homo sapiens CF transmembrane conductance regulator (CFTR), mRNA",6070,40.91,71,4513,4443,1480
-S64699,S64699.1,"S64699.1 Homo sapiens cystic fibrosis transmembrane conductance regulator isoform 36 (CFTR) mRNA, partial cds",119,39.5,15,65,51,16
-X73053,X73053.1,X73053.1 H.sapiens CFTR mutation mRNA,148,41.22,3,83,81,26
 BC143713,BC143713.1,"BC143713.1 Homo sapiens cDNA clone IMAGE:9052227, containing frame-shift errors",4594,41.97,1878,4538,2661,886
 M28668,M28668.1,"M28668.1 Human cystic fibrosis mRNA, encoding a presumed transmembrane conductance regulator (CFTR)",6129,40.97,133,4575,4443,1480
+S64699,S64699.1,"S64699.1 Homo sapiens cystic fibrosis transmembrane conductance regulator isoform 36 (CFTR) mRNA, partial cds",119,39.5,15,65,51,16
+X73053,X73053.1,X73053.1 H.sapiens CFTR mutation mRNA,148,41.22,3,83,81,26

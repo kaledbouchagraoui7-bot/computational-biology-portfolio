@@ -2,7 +2,7 @@
 
 **Kaled Bouchagraoui** · *Objective:* demonstrate competency in clinical data handling, literature synthesis, and genomic analysis for admission into a Swiss Master's program in Regulatory Affairs / Medical Science Writing.
 
-![Python](https://img.shields.io/badge/python-3.10-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/)
+![Python](https://img.shields.io/badge/python-3.10-blue) ![License](https://img.shields.io/badge/license-MIT-green) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaledbouchagraoui7-bot/computational-biology-portfolio/blob/main/computational-biology-portfolio/02_clinical_trial_eda.ipynb)
 
 ---
 
@@ -29,11 +29,12 @@ Extract and characterise five reference mRNA records for the **CFTR** gene (Cyst
 ```csv
 accession,version,description,length_nt,gc_percent,longest_orf_start,longest_orf_end,longest_orf_length_nt,predicted_protein_length_aa
 NM_000492,NM_000492.4,"NM_000492.4 Homo sapiens CF transmembrane conductance regulator (CFTR), mRNA",6070,40.91,71,4513,4443,1480
-S64699,S64699.1,"S64699.1 Homo sapiens cystic fibrosis transmembrane conductance regulator isoform 36 (CFTR) mRNA, partial cds",119,39.5,15,65,51,16
-X73053,X73053.1,X73053.1 H.sapiens CFTR mutation mRNA,148,41.22,3,83,81,26
 BC143713,BC143713.1,"BC143713.1 Homo sapiens cDNA clone IMAGE:9052227, containing frame-shift errors",4594,41.97,1878,4538,2661,886
 M28668,M28668.1,"M28668.1 Human cystic fibrosis mRNA, encoding a presumed transmembrane conductance regulator (CFTR)",6129,40.97,133,4575,4443,1480
+S64699,S64699.1,"S64699.1 Homo sapiens cystic fibrosis transmembrane conductance regulator isoform 36 (CFTR) mRNA, partial cds",119,39.5,15,65,51,16
+X73053,X73053.1,X73053.1 H.sapiens CFTR mutation mRNA,148,41.22,3,83,81,26
 ```
+*Rows are emitted in canonical curated-panel order (MANE Select first) regardless of which retrieval path supplied each record, so the CSV is stable across runs.*
 
 ### Cross-check
 `CROSS-CHECK NM_000492: expected ORF 4443 nt / 1480 aa -> PASS`
@@ -62,7 +63,7 @@ Demonstrate end-to-end clinical data management: ingest a raw, realistically mes
 ## Project 3 — Literature Synthesizer (Investigator Brochure Support)
 **Script:** `03_pubmed_literature_synthesizer.py` · **Outputs:** `pubmed_bibliography.csv`, `literature_matrix.md`
 
-Systematic literature surveillance for Investigator Brochure drafting and Reference Information Module assembly per **ICH M4**, with PMID-first citation traceability. Primary source: NCBI E-utilities (`esearch sort=date` → `efetch rettype=abstract`); fallback: Europe PMC REST JSON with cursorMark pagination (also forced via `EUROPE_PMC_ONLY=1`). Records are parsed (pmid, title, authors capped at 10 + "et al.", journal, pub_year, doi, single-line abstract), de-duplicated by PMID, filtered for empty titles/abstracts and recency window, then written to a CSV bibliography and a Markdown matrix (table + 5 most-recent objective-statement bullets). Verified live run: **25 curated records, 25/25 unique PMIDs**.
+Systematic literature surveillance for Investigator Brochure drafting and Reference Information Module assembly per **ICH M4**, with PMID-first citation traceability. Primary source: NCBI E-utilities (`esearch sort=date` → `efetch rettype=abstract`, with 2/4/8 s backoff retries and per-article truncation-resilient parsing); fallback: Europe PMC REST JSON with cursorMark pagination (also forced via `EUROPE_PMC_ONLY=1`; abstracts for lite-index degradation are batch-filled via verified `ext_id` core queries). Records are parsed (pmid, title, authors capped at 10 + "et al.", journal, pub_year, doi, single-line abstract), de-duplicated by PMID, filtered for empty titles/abstracts and recency window, then written to a CSV bibliography and a Markdown matrix (table + 5 most-recent objective-statement bullets). Verified live run: **25 curated records, 25/25 unique PMIDs, 25/25 DOIs resolved, 25/25 abstracts**.
 
 Exact run command:
 ```bash

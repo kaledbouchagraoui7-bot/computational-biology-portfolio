@@ -1,39 +1,39 @@
 # Literature Surveillance Matrix
 
-*Query:* `CFTR modulator therapy safety` · *Records:* 25 · *Generated:* 2026-10-18 · *Standard:* supports ICH M4 RIM/IB evidence assembly.
+*Query:* `CFTR modulator therapy safety` · *Records:* 25 · *Generated:* 2026-10-20 · *Standard:* supports ICH M4 RIM/IB evidence assembly.
 
 | PMID | Year | Journal | Title |
 |---|---|---|---|
-| 42864929 | 2026 | MicroRNA (Shariqah, United Arab Emirates) | MicroRNAs in Cystic Fibrosis: Dual Role in Pathogenesis and Therapeutic Potential. |
-| 42835559 | 2026 | Open respiratory archives | Efficacy of Elexacaftor/Tezacaftor/Ivacaftor in Cystic Fibrosis Patients With Severe Lung Disease Carrying Previously Ineligible CFTR Mutations. |
-| 42826236 | 2026 | Turkish archives of pediatrics | Adverse Events Associated with CFTR Modulator Therapy: Experience from a Tertiary Care Center. |
-| 42819752 | 2026 | Pregnancy (Hoboken, N.J.) | Prenatal CFTR modulator therapy for fetal cystic fibrosis: Emerging evidence, clinical considerations, and future directions. |
-| 42790887 | 2026 | Journal of mother and child | The New Landscape of Cystic Fibrosis in the Era of Highly Effective Cystic Fibrosis Transmembrane Conductance Regulator Modulator Therapy. |
-| 42778208 | 2026 | European respiratory review : an official journal of the European Respiratory Society | Maternal and fetal outcomes associated with CFTR modulator use during pregnancy: a scoping review. |
-| 42707002 | 2026 | Annals of the American Thoracic Society | Mental health safety profile of CFTR modulators in pediatrics and adults: insights from the French pharmacovigilance database and from VigiBase. |
-| 42680797 | 2026 | Pediatric research | Early CFTR modulation and clinical outcomes in preschool cystic fibrosis. |
-| 42678909 | 2026 | Fetal diagnosis and therapy | Prenatal Ultrasound and MRI of Bowel Abnormalities in Cystic Fibrosis with in utero Cystic Fibrosis Transmembrane Conductance Regulator Modulator Exposure: A Case Series. |
-| 42654157 | 2026 | Pharmaceutics | Combining Gene Therapy with Current Modulator Treatments for Cystic Fibrosis: A Promising Area of Research. |
-| 42537817 | 2026 | Respiratory medicine | Real-world efficacy, safety and heterogenicity of efficacy of elexacaftor-tezacaftor-ivacaftor in younger children (6-11 years old) with cystic fibrosis. |
-| 42532735 | 2026 | Journal of cystic fibrosis : official journal of the European Cystic Fibrosis Society | Real-world population pharmacokinetic modeling of elexacaftor, tezacaftor, and ivacaftor. |
-| 42488561 | 2026 | Frontiers in pharmacology | Case Report: When access is limited: using CYP3A4 inhibition to maintain clinical benefit from elexacaftor/tezacaftor/ivacaftor. |
-| 42442377 | 2026 | The Lancet. Respiratory medicine | The role of sweat chloride in determining CFTR protein restoration in people with cystic fibrosis. |
-| 42442376 | 2026 | The Lancet. Respiratory medicine | Reproductive health guidance for the cystic fibrosis community: a Cystic Fibrosis Foundation Position Paper. |
-| 42350209 | 2026 | Journal of cystic fibrosis : official journal of the European Cystic Fibrosis Society | SPL84 and trikafta® exhibit comparable and additive effects in patient-derived HBE cells carrying the 3849+10kb C→T/F508del CFTR variants. |
-| 42299466 | 2026 | Pediatric pulmonology | Real-Life Experience With a Generic Formulation of Elexacaftor/Tezacaftor/Ivacaftor in Patients With Cystic Fibrosis With Responding Variants. |
-| 42272190 | 2026 | Pediatric pulmonology | Real-World Clinical Outcomes of Lumacaftor-Ivacaftor or Tezacaftor-Ivacaftor Therapy in Children With Cystic Fibrosis Homozygous for Phe508del. |
-| 42174207 | 2026 | Pediatric research | Real-life effectiveness and safety of lumacaftor/ivacaftor in preschool children with cystic fibrosis: data from an italian multicentre study. |
-| 42167573 | 2026 | Endocrine practice : official journal of the American College of Endocrinology and the American Association of Clinical Endocrinologists | Reproductive Considerations in Females With Cystic Fibrosis. |
-| 42030963 | 2026 | The Lancet. Respiratory medicine | Contributors to the heterogeneity of response to CFTR modulators. |
-| 41993129 | 2026 | Frontiers in drug delivery | Nanoparticle-mediated mRNA delivery for cancer, autoimmunity, and genetic diseases: a rapid review. |
-| 41940508 | 2026 | Pediatric pulmonology | Patient-Derived Intestinal Organoids in the Global Cystic Fibrosis Landscape. |
-| 41907532 | 2026 | Frontiers in physiology | Targeted therapeutics for pancreatitis. |
-| 41827350 | 2026 | Journal of clinical medicine | Antenatal CFTR Modulators to Treat a Healthy Pregnant Woman with a Fetus Affected by Cystic Fibrosis Complicated by Meconium Ileus and Intestinal Volvulus: From a Suspicion of the Disease to a Targeted Treatment in Utero: Case Report and Narrative Review. |
+| 41601150 | 2026 | — | Synthetic strategies and therapeutic insights into FDA-approved indole-containing drugs. |
+| 42788363 | 2026 | — | Neutrophil extracellular traps in cardiovascular disease: Mechanisms and therapeutic implications (Review). |
+| 42891690 | 2026 | — | From historical dosing to precision dosing: Modernising tobramycin monitoring in people with cystic fibrosis. |
+| 42864929 | 2026 | — | MicroRNAs in Cystic Fibrosis: Dual Role in Pathogenesis and Therapeutic Potential. |
+| 42835559 | 2026 | — | Efficacy of Elexacaftor/Tezacaftor/Ivacaftor in Cystic Fibrosis Patients With Severe Lung Disease Carrying Previously Ineligible CFTR Mutations. |
+| 42825856 | 2026 | — | Bile acid signaling in health and disease. |
+| 42679602 | 2026 | — | Integration of biological avatars and digital twins for "ex vivo clinical trials". |
+| 42621635 | 2026 | — | Laboratory diagnostics in personalised medicine - 36th Symposium of the Croatian society of medical biochemistry and laboratory medicine. |
+| 42571285 | 2026 | — | A DNA Tetrahedron-Delivered miR-17-5p mimic exerts dual anti-inflammatory and Anti-&lt;i&gt;Pseudomonas aeruginosa&lt;/i&gt; effects in cystic fibrosis. |
+| 42537817 | 2026 | — | Real-world efficacy, safety and heterogenicity of efficacy of elexacaftor-tezacaftor-ivacaftor in younger children (6-11 years old) with cystic fibrosis. |
+| 42167573 | 2026 | — | Reproductive Considerations in Females With Cystic Fibrosis. |
+| 41951869 | 2026 | — | Cystic fibrosis care today-a narrative review based on views of experts, patients and the public. |
+| 41738286 | 2026 | — | Furin inhibition protects against acute lung injury in a mouse model of Pseudomonas aeruginosa infection. |
+| 41026912 | 2026 | — | The SLC-ome of membrane transport: from molecular discovery to physiology and clinical applications. |
+| 42797017 | 2026 | — | Nutritional Status and Caregiver Knowledge in Pediatric Cystic Fibrosis Management. |
+| 42796985 | 2026 | — | Evaluating Dietary Assessment Methods in Adults with Cystic Fibrosis in the Modulator Era: A Comparison of Food Frequency Questionnaires and Three-Day Food Diaries. |
+| 42793044 | 2026 | — | Decoding MAPT Exon 10 Mis-Splicing in FTDP-17: From Pathogenic Mechanisms and Experimental Models to Molecular Therapies. |
+| 42791029 | 2026 | — | Patient-centred understanding of quality of life, symptoms, health equity in cystic fibrosis (PULSE-CF): study protocol for an observational study. |
+| 42786162 | 2026 | — | RNA therapeutics: current status and future directions. |
+| 42772816 | 2026 | — | TIDES 2.0: A protocol for examining the prevalence and longitudinal course of depression, anxiety and behaviour problems in children with cystic fibrosis under 12 years of age. |
+| 42736262 | 2026 | — | The histone deacetylase family in health and disease. |
+| 42731120 | 2026 | — | Thermophysiological and perceptual responses to exercise heat stress in people with cystic fibrosis on Elexacaftor/Tezacaftor/Ivacaftor. |
+| 42707571 | 2026 | — | ERS Congress 2025: highlights from the Paediatrics Assembly. |
+| 42707060 | 2026 | — | Anti-inflammatory and phosphorylation effects of CFTR modulator triple therapy in cystic fibrosis. |
+| 42704391 | 2026 | — | Pulmonary exacerbations in primary ciliary dyskinesia. |
 
 ## Five Most Recent Records — Objective Statements
 
-- **PMID 42864929** (2026, MicroRNA (Shariqah, United Arab Emirates)): Cystic fibrosis (CF) is a severe inherited disorder caused by dysfunction of the cystic fibrosis transmembrane conductance regulator (CFTR), an epithelial ion channel essential for maintaining airway surface hydration and effective mucociliary clearance.
-- **PMID 42835559** (2026, Open respiratory archives): Cystic fibrosis transmembrane conductance regulator (CFTR) modulators have transformed cystic fibrosis (CF) treatment.
-- **PMID 42826236** (2026, Turkish archives of pediatrics): This study aimed to evaluate the frequency, nature, and potential factors associated with adverse events associated with cystic fibrosis transmembrane conductance regulator (CFTR) modulator therapy in a pediatric cystic fibrosis (CF) population.
-- **PMID 42819752** (2026, Pregnancy (Hoboken, N.J.)): The consequences of cystic fibrosis (CF) transmembrane conductance regulator (CFTR) protein dysfunction or absence begin during fetal development, with pancreatic, intestinal, hepatobiliary, and reproductive manifestations evident at birth.
-- **PMID 42790887** (2026, Journal of mother and child): For many years, the management of cystic fibrosis has had a personalised character.
+- **PMID 42891690** (2026, —): Historical therapeutic drug monitoring (TDM) strategies for intravenous tobramycin in people with cystic fibrosis (pwCF) were developed in the pre-CFTR modulator era and relied predominantly on clearance-based monitoring to minimise toxicity.
+- **PMID 42864929** (2026, —): Cystic fibrosis (CF) is a severe inherited disorder caused by dysfunction of the cystic fibrosis transmembrane conductance regulator (CFTR), an epithelial ion channel essential for maintaining airway surface hydration and effective mucociliary clearance.
+- **PMID 42835559** (2026, —): Introduction Cystic fibrosis transmembrane conductance regulator (CFTR) modulators have transformed cystic fibrosis (CF) treatment.
+- **PMID 42825856** (2026, —): Bile acids (BAs), cholesterol-derived amphipathic metabolites which are traditionally regarded as digestive surfactants, are now recognized as pleiotropic signaling molecules that act through ligand-, receptor-, and tissue-specific mechanisms to maintain systemic homeostasis.
+- **PMID 42797017** (2026, —): Introduction Cystic fibrosis (CF) is a rare, life-limiting genetic disorder characterized by abnormally thick mucus secretions that obstruct the respiratory, gastrointestinal, and reproductive tracts.

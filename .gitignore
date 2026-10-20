@@ -1,1 +1,35 @@
+# Publish-workflow staging directories (leaked into git once already)
 publish-checkout/
+publish-checkout-stage/
+
+# GenevaOS local database — created automatically next to the code on first
+# run; personal data, never commit it.
+geneva_os.db
+geneva_os.db-journal
+geneva_os.db-wal
+geneva_os.db-shm
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Portfolio script scratch outputs (when run from the repo root)
+/temp_*.png
