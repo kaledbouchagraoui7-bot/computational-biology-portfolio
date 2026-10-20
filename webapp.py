@@ -520,13 +520,15 @@ async function api(path,opt){
   return j;
 }
 const post=(path,body)=>api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+const fv=(f,n)=>f.querySelector('[name="'+n+'"]').value;   /* explicit form-field read: identical in every DOM */
+const setFv=(f,n,v)=>{f.querySelector('[name="'+n+'"]').value=v;};
 
 /* ---------- navigation ---------- */
 let curDay="today";
 const loaders={dash:loadDash,acad:loadAcad,run:loadRun,skin:()=>loadSkin(curDay),swiss:loadSwiss,hub:loadHub,folio:loadFolio};
-$("nav button").forEach(b=>b.addEventListener("click",()=>{
-  $("nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
-  $("main section").forEach(s=>s.classList.add("hidden"));
+$$("nav button").forEach(b=>b.addEventListener("click",()=>{
+  $$("nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  $$("main section").forEach(s=>s.classList.add("hidden"));
   $("#p-"+b.dataset.p).classList.remove("hidden");
   Promise.resolve((loaders[b.dataset.p]||(()=>{}))()).catch(e=>toast(e.message,"bad"));
 }));
@@ -572,10 +574,10 @@ async function loadAcad(){
 $("#f-acad").addEventListener("submit",async ev=>{
   ev.preventDefault();const f=ev.target;
   try{
-    const r=await post("/api/academics",{subject:f.subject.value,score:parseFloat(f.score.value),weight:parseFloat(f.weight.value),type:f.type.value});
+    const r=await post("/api/academics",{subject:fv(f,"subject"),score:parseFloat(fv(f,"score")),weight:parseFloat(fv(f,"weight")),type:fv(f,"type")});
     if(r.kill_switch.triggered.length){toast("☠ KILL SWITCH TRIGGERED — "+r.kill_switch.triggered.join(", ")+" below threshold","bad");}
     else{toast(`Entry #${r.id} logged — ${r.subject} rolling avg ${r.subject_avg===null?"—":r.subject_avg.toFixed(2)}/20`,"ok");}
-    f.subject.value="";f.score.value="";loadAcad();
+    setFv(f,"subject","");setFv(f,"score","");loadAcad();
   }catch(e){toast(e.message,"bad");}
 });
 
@@ -600,7 +602,7 @@ async function loadRun(){
 async function doPace(){
   const f=$("#f-pace");
   try{
-    const p=await api(`/api/pace?distance=${encodeURIComponent(f.distance.value)}&target=${encodeURIComponent(f.target.value)}`);
+    const p=await api(`/api/pace?distance=${encodeURIComponent(fv(f,"distance"))}&target=${encodeURIComponent(fv(f,"target"))}`);
     $("#pace-out").innerHTML=`<div class="note" style="margin-bottom:8px">Required pace — <b class="info">${esc(p.total_hms)}</b> over ${p.distance_m} m</div>`+paceTable(p);
   }catch(e){toast(e.message,"bad");$("#pace-out").innerHTML=`<div class="banner red">${esc(e.message)}</div>`;}
 }
@@ -608,7 +610,7 @@ $("#f-pace").addEventListener("submit",ev=>{ev.preventDefault();doPace();});
 $("#f-run").addEventListener("submit",async ev=>{
   ev.preventDefault();const f=ev.target;
   try{
-    const r=await post("/api/runs",{distance:parseFloat(f.distance.value),target:f.target.value,warmup:f.warmup.value==="1"});
+    const r=await post("/api/runs",{distance:parseFloat(fv(f,"distance")),target:fv(f,"target"),warmup:fv(f,"warmup")==="1"});
     toast(`Run #${r.id} saved — ${esc(r.hms)} over ${r.distance_m} m`,"ok");loadRun();
   }catch(e){toast(e.message,"bad");}
 });
@@ -654,9 +656,9 @@ async function loadSwiss(){
 $("#s-fund").addEventListener("submit",async ev=>{
   ev.preventDefault();const f=ev.target;
   try{
-    const r=await post("/api/swiss/fund",{amount:parseFloat(f.amount.value),source:f.source.value});
+    const r=await post("/api/swiss/fund",{amount:parseFloat(fv(f,"amount")),source:fv(f,"source")});
     toast(`Logged +CHF ${r.amount.toLocaleString("en",{minimumFractionDigits:2})} (${r.source})`,"ok");
-    f.amount.value="";loadSwiss();
+    setFv(f,"amount","");loadSwiss();
   }catch(e){toast(e.message,"bad");}
 });
 
