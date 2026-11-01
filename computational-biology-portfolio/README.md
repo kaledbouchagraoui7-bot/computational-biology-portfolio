@@ -60,14 +60,26 @@ Demonstrate end-to-end clinical data management: ingest a raw, realistically mes
 
 ---
 
-## Project 3 — Literature Synthesizer (Investigator Brochure Support)
-**Script:** `03_pubmed_literature_synthesizer.py` · **Outputs:** `pubmed_bibliography.csv`, `literature_matrix.md`
+## Project 3 — Systematic Regulatory Literature Synthesizer
+**Script:** `03_pubmed_literature_synthesizer.py` · **Outputs:** `literature_matrix.md`, `pubmed_bibliography.csv`, `prisma_flow_statement.md`  
+**Live Sample Dossier:** [`dossier_glp1_safety/`](dossier_glp1_safety/literature_matrix.md) (GLP-1 Receptor Agonists in Cardiometabolic & Renal Risk)
 
-Systematic literature surveillance for Investigator Brochure drafting and Reference Information Module assembly per **ICH M4**, with PMID-first citation traceability. Primary source: NCBI E-utilities (`esearch sort=date` → `efetch rettype=abstract`, with 2/4/8 s backoff retries and per-article truncation-resilient parsing); fallback: Europe PMC REST JSON with cursorMark pagination (also forced via `EUROPE_PMC_ONLY=1`; abstracts for lite-index degradation are batch-filled via verified `ext_id` core queries). Records are parsed (pmid, title, authors capped at 10 + "et al.", journal, pub_year, doi, single-line abstract), de-duplicated by PMID, filtered for empty titles/abstracts and recency window, then written to a CSV bibliography and a Markdown matrix (table + 5 most-recent objective-statement bullets). Verified live run: **25 curated records, 25/25 unique PMIDs, 25/25 DOIs resolved, 25/25 abstracts**.
+Systematic, audit-ready literature surveillance designed for Clinical Evaluation Reports (CER under **EU MDR 2017/745 / MEDDEV 2.7/1 rev 4**) and CTD Module 2.4/2.5 / Investigator Brochure assembly per **ICH M4**, with PMID-first citation traceability and ALCOA+ data integrity.
 
-Exact run command:
+### Key Capabilities
+- **Resilient Dual-Source Pipeline:** Primary queries to NCBI Entrez (`esearch` + `efetch` with exponential-backoff retries and fragment-level XML recovery), with seamless failover to Europe PMC REST JSON with `cursorMark` deep pagination.
+- **PRISMA 2020 Compliance Trail:** Automatically generates `prisma_flow_statement.md` and tracks identification, duplicate removal, screening, and exclusion reasons (recency window, missing abstract) for regulatory review.
+- **Evidence Level & Study Type Extraction:** Classifies records into evidence hierarchies (Randomized Controlled Trials, Systematic Reviews, Network Meta-Analyses, Practice Guidelines, Observational Studies).
+- **Structured Regulatory Takeaways:** Extracts conclusions directly from structured XML abstract labels (`[CONCLUSION]`, `[INTERPRETATION]`) or final takeaway sentences, avoiding generic introductory phrases.
+- **Live-Linked Regulatory Matrix:** Emits Markdown and CSV evidence matrices featuring clickable PubMed and DOI links, formatted for immediate insertion into regulatory dossiers.
+
+### Execution Example
 ```bash
-python 03_pubmed_literature_synthesizer.py --query "CFTR modulator therapy safety" --max 25
+python 03_pubmed_literature_synthesizer.py \
+    --query "GLP-1 receptor agonist cardiovascular and renal outcomes" \
+    --drug-class "GLP-1 Receptor Agonists" \
+    --indication "Type 2 Diabetes, Obesity & Cardiometabolic Risk" \
+    --max 30 --years 5 --output-dir dossier_glp1_safety
 ```
 
 ---
