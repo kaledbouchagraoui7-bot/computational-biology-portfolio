@@ -10,3 +10,5 @@ seaborn==0.13.2
 matplotlib==3.9.2
 requests==2.32.3
 beautifulsoup4==4.12.3
+openpyxl==3.1.5
+python-docx==1.2.0

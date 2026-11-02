@@ -1,30 +1,26 @@
 #!/usr/bin/env python3
 """
-03_pubmed_literature_synthesizer.py — Systematic Literature Surveillance Utility
-=================================================================================
+03_pubmed_literature_synthesizer.py — Systematic Literature Surveillance & Pilot Package Engine
+================================================================================================
 
 Purpose
 -------
 Systematic, reproducible literature surveillance for Clinical Evaluation Reports
 (CER per EU MDR 2017/745) and CTD Module 2.4/2.5 / Investigator Brochure (IB per ICH M4).
-Queries NCBI Entrez (PubMed) and Europe PMC, performs automated deduplication,
-extracts structured clinical conclusions and publication types (RCT, Meta-analysis, etc.),
-enforces PRISMA selection auditability, and generates publication-grade dossiers with live links.
 
-Regulatory / scientific relevance
----------------------------------
-* ICH M4 / ICH E6(R2) / EU MDR 2017/745 compliance.
-* PRISMA 2020 systematic tracking: record identification -> duplicate removal -> 
-  eligibility screening -> final included synthesis.
-* Traceable citation integrity: PMID-first primary keys with live DOI links.
-* ALCOA+ Data Integrity: Attributable, Legible, Contemporaneous, Original, Accurate.
-* Resilient dual-source transport: NCBI Entrez primary with automatic failover to Europe PMC REST.
-
-Usage
------
-    python 03_pubmed_literature_synthesizer.py \
-        --query "GLP-1 receptor agonist cardiovascular and renal outcomes" \
-        --max 50 --years 5 --output-dir dossier_glp1_safety
+Supports two execution modes:
+  1. Live Surveillance Mode (default):
+     Queries NCBI Entrez (PubMed) and Europe PMC, deduplicates, extracts structured
+     conclusions and study types, enforces PRISMA 2020 selection auditability, and
+     automatically exports:
+       - Formatted Excel workbook (.xlsx) with Study Type, Title, Conclusion, PMID,
+         clickable DOI, frozen headers, AutoFilter, and yellow QA highlights
+       - Visual PRISMA 2020 Flowchart (prisma_flow_diagram.png at 300 DPI + .pdf)
+       - Landscape Word (.docx) clinical evidence table
+       - Markdown & CSV evidence matrices
+  2. Pre-Screened CSV Pilot Package Mode (`--from-csv records.csv --config config.json`):
+     Builds the complete QA pilot package (`output/<project_slug>_pilot/` and `.zip`)
+     directly from a screened `records.csv` and `config.json`.
 """
 
 from __future__ import annotations
@@ -37,8 +33,22 @@ import re
 import sys
 import time
 import urllib.error
+from pathlib import Path
 
 import requests
+
+# Ensure local imports resolve cleanly regardless of working directory
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from pilot_package_generator import (
+    build_pilot_package,
+    compute_and_verify_prisma,
+    generate_excel_xlsx,
+    generate_prisma_flowchart,
+    generate_word_docx,
+)
 
 # ---------------------------------------------------------------------------
 # Configuration & NCBI Entrez courtesy contact
@@ -111,27 +121,38 @@ def clean_abstract_text(raw: str | None) -> str:
 
 
 def extract_key_takeaway(abstract: str, fallback_direct: str = "") -> str:
-    """Extract clinical conclusion / takeaway.
-    In regulatory/scientific literature, the final sentence of the abstract
-    typically carries the author's primary finding or conclusion.
-    """
+    """Extract clinical conclusion / takeaway without fabricating content."""
     if fallback_direct:
         return fallback_direct
     if not abstract:
-        return "No abstract available in public record."
-    
-    # Check for labeled structured section [CONCLUSION] or [CONCLUSIONS]
-    m = re.search(r"\[(?:CONCLUSION|CONCLUSIONS|INTERPRETATION)\]\s*(.*?)(?=\[[A-Z\s]+\]|$)", abstract, re.IGNORECASE)
+        return ""
+
+    m = re.search(
+        r"\[(?:CONCLUSION|CONCLUSIONS|INTERPRETATION)\]\s*(.*?)(?=\[[A-Z\s]+\]|$)",
+        abstract,
+        re.IGNORECASE,
+    )
     if m:
         c = clean_abstract_text(m.group(1))
         if len(c) > 15:
             return c
 
-    # Otherwise split sentences and take the final complete clinical sentence
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", abstract) if len(s.strip()) > 25]
     if sentences:
         return sentences[-1]
-    return (abstract[:220] + "...").strip()
+    return abstract[:220].strip()
+
+
+def extract_structured_section(abstract: str, labels: tuple[str, ...]) -> str:
+    """Extract a labeled section (e.g. POPULATION/METHODS/RESULTS) if present in structured abstract."""
+    if not abstract:
+        return ""
+    pattern = r"\[(?:" + "|".join(labels) + r")\]\s*(.*?)(?=\[[A-Z\s/]+\]|$)"
+    m = re.search(pattern, abstract, re.IGNORECASE)
+    if m:
+        val = clean_abstract_text(m.group(1))
+        return (val[:220] + "...") if len(val) > 220 else val
+    return ""
 
 
 def format_authors(names: list[tuple[str, str]]) -> str:
@@ -176,9 +197,9 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
 
     retmax = min(max_records * 2, 500)
 
-    # --- esearch ---
     handle = _entrez_call_with_backoff(
-        Entrez.esearch, db="pubmed", term=query, retmax=retmax, sort="date")
+        Entrez.esearch, db="pubmed", term=query, retmax=retmax, sort="date"
+    )
     search = Entrez.read(handle)
     handle.close()
     id_list = search.get("IdList", [])
@@ -187,14 +208,14 @@ def entrez_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
 
     log(f"NCBI Entrez identified {len(id_list)} record IDs matching query.")
 
-    # --- efetch ---
     records: list[dict] = []
     batch = 50
     for i in range(0, len(id_list), batch):
         chunk = id_list[i:i + batch]
         handle = _entrez_call_with_backoff(
             Entrez.efetch, db="pubmed", id=",".join(chunk),
-            rettype="abstract", retmode="xml")
+            rettype="abstract", retmode="xml"
+        )
         raw = handle.read()
         handle.close()
         if isinstance(raw, str):
@@ -247,7 +268,6 @@ def _parse_pubmed_article(article_el) -> dict | None:
     article = medline.get("Article", {})
     title = clean_abstract_text(str(article.get("ArticleTitle", "")))
 
-    # 1. Publication Type (Evidence level classification)
     pub_types = []
     for pt in article.get("PublicationTypeList", []):
         pt_name = str(pt).strip()
@@ -255,7 +275,6 @@ def _parse_pubmed_article(article_el) -> dict | None:
             pub_types.append(pt_name)
     pub_type_str = "; ".join(pub_types[:2]) if pub_types else "Clinical Investigation"
 
-    # 2. Authors
     names: list[tuple[str, str]] = []
     for a in article.get("AuthorList", []):
         if getattr(a, "type", None) == "CollectiveName" or ("CollectiveName" in a and "LastName" not in a):
@@ -266,7 +285,6 @@ def _parse_pubmed_article(article_el) -> dict | None:
             if last:
                 names.append((last, first_i))
 
-    # 3. Journal & Year
     journal = ""
     try:
         journal = str(article["Journal"].get("Title", "")) or str(article["Journal"].get("ISOAbbreviation", ""))
@@ -283,7 +301,6 @@ def _parse_pubmed_article(article_el) -> dict | None:
     except Exception:
         pass
 
-    # 4. DOI
     doi = ""
     pubmed_data = article_el.get("PubmedData", {}) if hasattr(article_el, "get") else {}
     for aid in pubmed_data.get("ArticleIdList", []):
@@ -303,7 +320,6 @@ def _parse_pubmed_article(article_el) -> dict | None:
                 doi = str(e).strip()
                 break
 
-    # 5. Abstract & Structured Takeaway Extraction
     abstract_texts = article.get("Abstract", {}).get("AbstractText", [])
     if not isinstance(abstract_texts, list):
         abstract_texts = [abstract_texts]
@@ -396,13 +412,12 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
                     names.append((m.group(1).strip(), ini))
                 else:
                     names.append((chunk, ""))
-            
+
             pub_year = ""
             pdt = item.get("pubYear", "") or ""
             m = re.search(r"\b(19|20)\d{2}\b", str(pdt))
             pub_year = m.group(0) if m else ""
 
-            # Extract Pub Type
             pt_list = item.get("pubTypeList", {}).get("pubType", [])
             if isinstance(pt_list, list):
                 pt_filtered = [p for p in pt_list if p.lower() != "journal article"]
@@ -437,12 +452,14 @@ def europepmc_fetch(query: str, max_records: int) -> tuple[list[dict], int]:
 # ---------------------------------------------------------------------------
 # Curation & PRISMA 2020 Compliance Engine
 # ---------------------------------------------------------------------------
-def curate(records: list[dict], years: int) -> tuple[list[dict], dict]:
-    """De-duplicate by PMID; enforce eligibility criteria; record full PRISMA metrics."""
+def curate(records: list[dict], years: int, max_records: int) -> tuple[list[dict], list[dict], dict]:
+    """De-duplicate by PMID; enforce eligibility criteria; record full PRISMA metrics
+    and emit normalized screening records for the Excel/Word/PRISMA generator."""
     current_year = int(time.strftime("%Y"))
     min_year = current_year - years
     seen_ids: set[str] = set()
     kept: list[dict] = []
+    normalized_all: list[dict[str, str]] = []
 
     prisma = {
         "identified_raw": len(records),
@@ -450,6 +467,7 @@ def curate(records: list[dict], years: int) -> tuple[list[dict], dict]:
         "screened": 0,
         "excluded_missing_content": 0,
         "excluded_prior_to_window": 0,
+        "excluded_beyond_cap": 0,
         "included_final": 0,
         "surveillance_window": f"{min_year}–{current_year}",
     }
@@ -460,29 +478,68 @@ def curate(records: list[dict], years: int) -> tuple[list[dict], dict]:
             pid = r["doi"] or r["title"][:60]
             r["pmid"] = pid
 
+        pop_hint = extract_structured_section(r["abstract"], ("METHODS", "PATIENTS", "POPULATION", "PARTICIPANTS", "DESIGN"))
+        out_hint = extract_structured_section(r["abstract"], ("RESULTS", "FINDINGS", "OUTCOMES"))
+
+        base_norm = {
+            "record_id": f"PMID-{pid}" if str(pid).isdigit() else str(pid),
+            "title": r["title"],
+            "authors": r["authors"],
+            "year": r["pub_year"],
+            "journal": r["journal"],
+            "doi": r["doi"],
+            "study_type": r["pub_type"],
+            "population": pop_hint,
+            "intervention_exposure": "",
+            "outcome": out_hint,
+            "conclusion": r["key_takeaway"],
+            "screening_stage": "included",
+            "exclusion_reason": "",
+        }
+
         if pid in seen_ids:
             prisma["duplicates_removed"] += 1
+            base_norm["screening_stage"] = "identified"
+            base_norm["exclusion_reason"] = "Duplicate record"
+            normalized_all.append(base_norm)
             continue
         seen_ids.add(pid)
         prisma["screened"] += 1
 
         if not r["title"] or not r["abstract"] or len(r["abstract"]) < 40:
             prisma["excluded_missing_content"] += 1
+            base_norm["screening_stage"] = "screened"
+            base_norm["exclusion_reason"] = "Missing or incomplete abstract text"
+            normalized_all.append(base_norm)
             continue
 
         try:
             yr = int(r["pub_year"])
             if yr < min_year:
                 prisma["excluded_prior_to_window"] += 1
+                base_norm["screening_stage"] = "screened"
+                base_norm["exclusion_reason"] = f"Published prior to {min_year} window"
+                normalized_all.append(base_norm)
                 continue
         except (ValueError, TypeError):
             prisma["excluded_prior_to_window"] += 1
+            base_norm["screening_stage"] = "screened"
+            base_norm["exclusion_reason"] = "Unverifiable publication year"
+            normalized_all.append(base_norm)
+            continue
+
+        if len(kept) >= max_records:
+            prisma["excluded_beyond_cap"] += 1
+            base_norm["screening_stage"] = "full_text"
+            base_norm["exclusion_reason"] = f"Outside top-{max_records} recency cohort cap"
+            normalized_all.append(base_norm)
             continue
 
         kept.append(r)
+        normalized_all.append(base_norm)
 
     prisma["included_final"] = len(kept)
-    return kept, prisma
+    return kept, normalized_all, prisma
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +583,8 @@ Records identified through database searching (NCBI Entrez / Europe PMC): {prism
 Records Screened: {prisma['screened']}
                         │
                         ├─► Excluded (Incomplete metadata / Missing abstract): {prisma['excluded_missing_content']}
-                        └─► Excluded (Outside {prisma['surveillance_window']} surveillance window): {prisma['excluded_prior_to_window']}
+                        ├─► Excluded (Outside {prisma['surveillance_window']} surveillance window): {prisma['excluded_prior_to_window']}
+                        └─► Excluded (Beyond top-{prisma['included_final']} protocol cap): {prisma['excluded_beyond_cap']}
                         │
                         ▼
 [ INCLUDED ]
@@ -542,13 +600,14 @@ Final Curated Records Included in Regulatory Evidence Dossier: {prisma['included
 | **Screened Population** | {prisma['screened']} | Unique records evaluated against eligibility protocol |
 | **Content Exclusions** | {prisma['excluded_missing_content']} | Records lacking verifiable abstract text for review |
 | **Recency Exclusions** | {prisma['excluded_prior_to_window']} | Records published before {prisma['surveillance_window'].split('–')[0]} |
+| **Cohort Cap Exclusions** | {prisma['excluded_beyond_cap']} | Screened records beyond target cohort cap |
 | **Final Dossier Population** | **{prisma['included_final']}** | **100% verified, cited, and audit-traceable** |
 """
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content)
 
 
-def write_dossier(records: list[dict], prisma: dict, path: str, 
+def write_dossier(records: list[dict], prisma: dict, path: str,
                   query: str, drug_class: str, indication: str) -> None:
     lines = [
         f"# Regulatory Evidence Matrix — {drug_class}",
@@ -563,7 +622,7 @@ def write_dossier(records: list[dict], prisma: dict, path: str,
         f"- **Clinical Indication:** {indication}",
         f"- **Database Query:** `{query}`",
         f"- **Surveillance Recency Window:** {prisma['surveillance_window']} (Last 5 Years)",
-        f"- **Verification Protocol:** PRISMA 2020 Flow Audit (see `prisma_flow_statement.md`)",
+        f"- **Verification Protocol:** PRISMA 2020 Flow Audit (see `prisma_flow_statement.md` & `prisma_flow_diagram.png`)",
         f"- **Included Evidence Records:** {len(records)} studies",
         "",
         "## 2. Executive Summary — 5 Most Recent High-Impact Findings",
@@ -607,21 +666,33 @@ def write_dossier(records: list[dict], prisma: dict, path: str,
 # ---------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Regulatory Literature Synthesizer for CER/IB Evidence Dossiers (ICH M4 / MDR).")
+        description="Regulatory Literature Synthesizer & Pilot Package Generator (ICH M4 / EU MDR)."
+    )
+    parser.add_argument("--from-csv", dest="from_csv", default=None,
+                        help="Build pilot package directly from an existing screened records.csv file")
+    parser.add_argument("--config", dest="config_path", default="config.json",
+                        help="Path to config.json when running with --from-csv")
     parser.add_argument("--query", default="GLP-1 receptor agonist cardiovascular and renal outcomes",
                         help="Search query string")
     parser.add_argument("--drug-class", default="GLP-1 Receptor Agonists",
                         help="Drug class or product identifier")
-    parser.add_argument("--indication", default="Type 2 Diabetes, Obesity & Cardiometabolic Disease",
+    parser.add_argument("--indication", default="Type 2 Diabetes, Obesity & Cardiometabolic Risk",
                         help="Clinical indication scope")
-    parser.add_argument("--max", type=int, default=50, dest="max_records",
-                        help="Maximum curated records (default 50)")
+    parser.add_argument("--max", type=int, default=30, dest="max_records",
+                        help="Maximum curated records (default 30)")
     parser.add_argument("--years", type=int, default=5,
                         help="Surveillance window in years (default 5)")
     parser.add_argument("--output-dir", default="dossier_glp1_safety",
                         help="Directory to save dossier deliverables")
     args = parser.parse_args(argv)
 
+    # Mode 1: Direct CSV + config.json Pilot Package Generation
+    if args.from_csv:
+        res = build_pilot_package(args.from_csv, args.config_path, args.output_dir)
+        log(f"Pilot package generated at: {res['zip']}")
+        return 0
+
+    # Mode 2: Live PubMed / Europe PMC Surveillance + Full Excel/Word/PRISMA Suite
     os.makedirs(args.output_dir, exist_ok=True)
 
     force_epmc = os.environ.get("EUROPE_PMC_ONLY", "0") == "1"
@@ -665,38 +736,60 @@ def main(argv: list[str] | None = None) -> int:
         log("ERROR: Zero records retrieved from both repositories.")
         return 1
 
-    curated, prisma = curate(records, args.years)
-    curated = curated[:args.max_records]
+    curated, normalized_all, prisma = curate(records, args.years, args.max_records)
 
     if not curated:
         log("ERROR: All retrieved records were excluded by PRISMA quality filters.")
         return 1
 
-    # Output paths
+    # Output paths inside --output-dir
     csv_path = os.path.join(args.output_dir, "pubmed_bibliography.csv")
     md_path = os.path.join(args.output_dir, "literature_matrix.md")
-    prisma_path = os.path.join(args.output_dir, "prisma_flow_statement.md")
+    prisma_md_path = os.path.join(args.output_dir, "prisma_flow_statement.md")
+    xlsx_path = os.path.join(args.output_dir, "pubmed_literature_matrix.xlsx")
+    docx_path = os.path.join(args.output_dir, "clinical_evidence_table.docx")
+    png_path = os.path.join(args.output_dir, "prisma_flow_diagram.png")
+    pdf_path = os.path.join(args.output_dir, "prisma_flow_diagram.pdf")
 
     write_csv(curated, csv_path)
-    write_prisma_report(prisma, prisma_path, args.query)
+    write_prisma_report(prisma, prisma_md_path, args.query)
     write_dossier(curated, prisma, md_path, args.query, args.drug_class, args.indication)
 
-    print("\n" + "=" * 60)
+    # Build config dict for the Excel, Word, and PRISMA 2020 visual diagram
+    live_config = {
+        "project_slug": Path(args.output_dir).name,
+        "project_title": f"{args.drug_class} — Systematic Literature Surveillance",
+        "indication": args.indication,
+        "search_string": args.query,
+        "databases_searched": {source_used: len(records)},
+        "date_of_search": time.strftime("%Y-%m-%d"),
+        "duplicates_removed_count": prisma["duplicates_removed"],
+        "is_fictional_sample": False,
+    }
+    verified_prisma = compute_and_verify_prisma(normalized_all, live_config)
+    generate_excel_xlsx(normalized_all, live_config, verified_prisma, xlsx_path)
+    generate_word_docx(normalized_all, live_config, verified_prisma, docx_path)
+    generate_prisma_flowchart(verified_prisma, live_config, png_path, pdf_path)
+
+    print("\n" + "=" * 64)
     print("   REGULATORY LITERATURE SYNTHESIS COMPLETE (ALCOA+)")
-    print("=" * 60)
+    print("=" * 64)
     print(f"Target Subject         : {args.drug_class}")
     print(f"Indication Scope       : {args.indication}")
     print(f"Primary Source Engine  : {source_used}")
     print(f"Raw Records Identified : {prisma['identified_raw']}")
     print(f"Duplicates Removed     : {prisma['duplicates_removed']}")
     print(f"Screened Records       : {prisma['screened']}")
-    print(f"Excluded (QC / Window) : {prisma['excluded_missing_content'] + prisma['excluded_prior_to_window']}")
     print(f"Final Included Dossier : {len(curated)} records")
-    print("-" * 60)
+    print("-" * 64)
     print(f"Evidence Matrix (MD)   : {md_path}")
     print(f"Structured Database    : {csv_path}")
-    print(f"PRISMA Flow Statement  : {prisma_path}")
-    print("=" * 60 + "\n")
+    print(f"Excel Workbook (.xlsx) : {xlsx_path}")
+    print(f"Word Evidence (.docx)  : {docx_path}")
+    print(f"PRISMA Flow (PNG 300d) : {png_path}")
+    print(f"PRISMA Flow (PDF)      : {pdf_path}")
+    print(f"PRISMA Statement (MD)  : {prisma_md_path}")
+    print("=" * 64 + "\n")
     return 0
 
 

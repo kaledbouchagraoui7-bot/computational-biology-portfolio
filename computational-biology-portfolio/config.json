@@ -1,0 +1,13 @@
+{
+  "project_slug": "glp1_cardiorenal_sample",
+  "project_title": "[SAMPLE - FICTIONAL DEMO DATA] GLP-1 Receptor Agonists in Cardiorenal Syndrome & T2DM",
+  "indication": "Type 2 Diabetes Mellitus with Chronic Kidney Disease / Heart Failure (Fictional Demo Cohort)",
+  "search_string": "(\"GLP-1 receptor agonist\" OR semaglutide OR tirzepatide) AND (\"cardiorenal\" OR \"renal outcomes\" OR \"heart failure\") AND 2021:2026[dp]",
+  "databases_searched": {
+    "PubMed (NCBI Entrez)": 18,
+    "Europe PMC": 12
+  },
+  "date_of_search": "2026-11-02",
+  "duplicates_removed_count": 4,
+  "is_fictional_sample": true
+}
