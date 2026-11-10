@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/sentinel_logo_editorial.png" alt="Sentinel Ecosystem — Computational Biology & GenevaOS" width="620" />
+</div>
+
 # Computational Biology Portfolio + ⚡ GenevaOS
 
 **Kaled Bouchagraoui** — two projects, one repository:
