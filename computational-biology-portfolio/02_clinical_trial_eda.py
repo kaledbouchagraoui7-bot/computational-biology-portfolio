@@ -414,10 +414,12 @@ def make_figure(df: pd.DataFrame, png_path: str, seed: int = SEED_DEFAULT) -> No
     ax.scatter(means.index, means.values, marker="D", s=110, color="crimson",
                zorder=5, label="group mean")
     ax.set_title("Figure 1 — Biomarker Level by Treatment Arm\n"
-                 "(synthetic cohort, seed=2027; lower = intended PD effect)",
+                 f"(synthetic cohort, seed={seed}; lower = intended PD effect)",
                  fontsize=15)
     ax.set_xlabel("")
     ax.set_ylabel("Biomarker Level (arb. units)")
+    y0, y1 = ax.get_ylim()
+    ax.set_ylim(y0, y1 + (y1 - y0) * 0.14)
     ax.legend(loc="upper right")
     fig.tight_layout()
     fig.savefig(png_path, dpi=150)

@@ -167,6 +167,56 @@ class TestPilotPackageGenerator(unittest.TestCase):
                 self.assertTrue(any(n.endswith(".bib") for n in names))
                 self.assertTrue(any(n.endswith("TERMS_OF_SERVICE_AND_DISCLAIMER.txt") for n in names))
 
+    def test_prisma_counts_formulas_scale_dynamically_with_record_count(self) -> None:
+        import csv as _csv
+        import json as _json
+        import tempfile
+
+        subset = self.records[:8]
+        # Adjust 8 records to obey PRISMA conservation cleanly: 8 total - 1 dup = 7 screened (2 excl, 5 ft: 1 excl, 4 inc)
+        stages = [
+            ("identified", "Duplicate record"),
+            ("screened", "Animal or in vitro study"),
+            ("screened", "Outcome not relevant"),
+            ("full_text", "Wrong study design / insufficient endpoint data"),
+            ("included", ""),
+            ("included", ""),
+            ("included", ""),
+            ("included", ""),
+        ]
+        for idx, (stg, reason) in enumerate(stages):
+            subset[idx]["screening_stage"] = stg
+            subset[idx]["exclusion_reason"] = reason
+            subset[idx]["doi"] = subset[idx].get("doi") or "10.1000/dyn." + str(idx)
+            subset[idx]["conclusion"] = subset[idx].get("conclusion") or "Endpoint observed."
+
+        with tempfile.TemporaryDirectory(prefix="pilot_dyn_rows_") as td:
+            td_p = Path(td)
+            csv_p = td_p / "sub_records.csv"
+            cfg_p = td_p / "sub_cfg.json"
+            with csv_p.open("w", encoding="utf-8", newline="") as f:
+                w = _csv.DictWriter(f, fieldnames=list(subset[0].keys()))
+                w.writeheader()
+                w.writerows(subset)
+            cfg = copy.deepcopy(self.config)
+            cfg["databases_searched"] = {"PubMed": 5, "Europe PMC": 3}
+            cfg["duplicates_removed_count"] = 1
+            cfg_p.write_text(_json.dumps(cfg), encoding="utf-8")
+
+            res = build_pilot_package(csv_p, cfg_p, td_p / "out")
+            wb = openpyxl.load_workbook(str(res["xlsx"]), data_only=False)
+            formulas = [
+                str(wb["PRISMA_Counts"].cell(row=r, column=4).value or "")
+                for r in range(2, wb["PRISMA_Counts"].max_row + 1)
+            ]
+            self.assertTrue(any("Records!L2:L9" in fl for fl in formulas), f"Expected dynamic range L2:L9, got {formulas}")
+            readme_txt = "\n".join(
+                str(cell.value or "")
+                for row in wb["README"].iter_rows()
+                for cell in row
+            )
+            self.assertNotIn("#FFF2CC", readme_txt)
+
 
 if __name__ == "__main__":
     unittest.main()

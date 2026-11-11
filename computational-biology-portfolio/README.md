@@ -12,7 +12,7 @@ This suite operationalizes core clinical evidence and biostatistics disciplines 
 
 1. **Deterministic Reproducibility:** Pinned dependencies, seeded synthetic QA benchmarks (`seed=2027` for byte-identical re-runs), and versioned public database accessions preserved per row.
 2. **End-to-End Audit Traceability:** Every output links to primary `PMID` / `DOI` / RefSeq accession identifiers with printed transformation trails.
-3. **Zero Fabrication & Privacy-by-Design:** Missing DOIs or extracted study conclusions are never fabricated — empty cells are flagged in soft yellow (`#FFF2CC`) for qualified medical-writer sign-off, and zero identifiable patient PHI is processed.
+3. **Zero Fabrication & Privacy-by-Design:** Missing DOIs or extracted study conclusions are never fabricated — empty cells are highlighted in soft amber for qualified medical-writer sign-off, and zero identifiable patient PHI is processed.
 
 ---
 
@@ -40,7 +40,7 @@ This suite operationalizes core clinical evidence and biostatistics disciplines 
 - **Dual-Source Resilience:** Primary NCBI Entrez XML retrieval with seamless failover to Europe PMC REST JSON (`cursorMark` deep pagination).
 - **Arithmetic Conservation Enforcement:** Automatically validates `Identified - Duplicates = Screened = Excluded + Full-Text = Included` before emitting deliverables.
 - **Turnkey Client Deliverables:**
-  - Landscape Word Evidence Dossier (`.docx`) with Vancouver citations and yellow `#FFF2CC` QA verification highlights
+  - Landscape Word Evidence Dossier (`.docx`) with Vancouver citations and soft amber QA verification highlights
   - 4-Sheet Filterable Excel Screening Workbook (`.xlsx`) with live `COUNTIFS` formulas and clickable `doi.org` links
   - 300-DPI Vector PDF & PNG PRISMA 2020 Flow Diagram
 

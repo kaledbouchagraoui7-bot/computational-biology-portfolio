@@ -801,6 +801,7 @@ def generate_excel_xlsx(
         c.fill = hdr_fill
         c.border = cell_border
 
+    last_rec_row = max(len(records) + 1, 2)
     prisma_rows = [
         ("Identification", "Total records identified from databases", prisma["total_identified"], "Sum of database search hits"),
     ]
@@ -810,10 +811,10 @@ def generate_excel_xlsx(
     prisma_rows.extend([
         ("Identification", "Duplicate records removed before screening", prisma["duplicates_removed"], "config.json / screening_stage='identified'"),
         ("Screening", "Records screened (title and abstract)", prisma["records_screened"], "Identified minus duplicates removed"),
-        ("Screening", "Records excluded at title/abstract screening", prisma["excluded_at_screening"], "=COUNTIF(Records!L2:L31, \"screened\")"),
+        ("Screening", "Records excluded at title/abstract screening", prisma["excluded_at_screening"], f'=COUNTIF(Records!L2:L{last_rec_row}, "screened")'),
         ("Screening (Eligibility)", "Reports sought for retrieval & assessed for full-text eligibility", prisma["reports_assessed_full_text"], "Screened minus excluded at title/abstract"),
-        ("Screening (Eligibility)", "Reports excluded at full-text eligibility review", prisma["excluded_at_full_text"], "=COUNTIF(Records!L2:L31, \"full_text\")"),
-        ("Included", "Studies included in final synthesis", prisma["studies_included"], "=COUNTIF(Records!L2:L31, \"included\")"),
+        ("Screening (Eligibility)", "Reports excluded at full-text eligibility review", prisma["excluded_at_full_text"], f'=COUNTIF(Records!L2:L{last_rec_row}, "full_text")'),
+        ("Included", "Studies included in final synthesis", prisma["studies_included"], f'=COUNTIF(Records!L2:L{last_rec_row}, "included")'),
     ])
 
     for row in prisma_rows:
@@ -901,7 +902,7 @@ def generate_excel_xlsx(
         ("Sheet: PRISMA_Counts", "Exact stage-by-stage numbers feeding the PRISMA 2020 flow diagram, verified for mathematical conservation."),
         ("Sheet: Exclusion_Reasons", "Breakdown of excluded records by screening stage and specific exclusion reason using live Excel COUNTIFS formulas."),
         ("Methodological Appraisal (RoB)", summarize_rob_framework(records)["framework_summary"]),
-        ("Integrity & Highlighting Rule", "No citations, DOIs, or conclusions are ever fabricated. Any missing field is left blank, highlighted in soft yellow (#FFF2CC), and flagged in the 'needs_verification' column for manual QA check against the source publication."),
+        ("Integrity & Highlighting Rule", "No citations, DOIs, or conclusions are ever fabricated. Any missing field is left blank, highlighted in soft amber, and flagged in the 'needs_verification' column for manual QA check against the source publication."),
     ]
     for r in readme_rows:
         ws_readme.append(list(r))
