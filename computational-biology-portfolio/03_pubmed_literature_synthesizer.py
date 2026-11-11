@@ -531,7 +531,7 @@ def curate(records: list[dict], years: int, max_records: int) -> tuple[list[dict
         if len(kept) >= max_records:
             prisma["excluded_beyond_cap"] += 1
             base_norm["screening_stage"] = "full_text"
-            base_norm["exclusion_reason"] = f"Outside top-{max_records} recency cohort cap"
+            base_norm["exclusion_reason"] = f"Excluded beyond {max_records}-study recency window"
             normalized_all.append(base_norm)
             continue
 

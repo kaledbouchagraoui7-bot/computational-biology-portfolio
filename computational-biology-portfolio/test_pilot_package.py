@@ -10,8 +10,10 @@ import docx
 import openpyxl
 
 from pilot_package_generator import (
+    _clean_prisma_reason,
     build_pilot_package,
     compute_and_verify_prisma,
+    generate_prisma_flowchart,
     load_inputs,
 )
 
@@ -116,6 +118,27 @@ class TestPilotPackageGenerator(unittest.TestCase):
         with zipfile.ZipFile(res["zip"], "r") as zf:
             names = zf.namelist()
             self.assertEqual(len(names), 4)
+
+    def test_clean_prisma_reason_and_missing_search_date_fallback(self) -> None:
+        self.assertEqual(
+            _clean_prisma_reason("Outside top-20 recency cohort cap"),
+            "Excluded beyond 20-study recency window",
+        )
+        self.assertEqual(
+            _clean_prisma_reason("Excluded beyond 25-study recency window"),
+            "Excluded beyond 25-study recency window",
+        )
+        import tempfile
+        prisma = compute_and_verify_prisma(self.records, self.config)
+        cfg_no_date = copy.deepcopy(self.config)
+        cfg_no_date.pop("date_of_search", None)
+        cfg_no_date["search_date"] = "—"
+        with tempfile.TemporaryDirectory(prefix="prisma_fallback_") as td:
+            png_out = Path(td) / "prisma_fallback.png"
+            pdf_out = Path(td) / "prisma_fallback.pdf"
+            generate_prisma_flowchart(prisma, cfg_no_date, png_out, pdf_out)
+            self.assertTrue(png_out.exists() and png_out.stat().st_size > 20000)
+            self.assertTrue(pdf_out.exists() and pdf_out.stat().st_size > 5000)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import json
 import os
 import re
@@ -516,7 +517,64 @@ def generate_word_docx(
                 flag_run.font.bold = True
                 flag_run.font.color.rgb = RGBColor(0xB4, 0x5F, 0x06)
 
+    append_docx, _, _ = _load_pilot_legal_helpers()
+    append_docx(doc, track="clinical_lit_prisma")
+
     doc.save(str(out_path))
+
+
+def _load_pilot_legal_helpers():
+    """Load `legal_terms` from local or sibling suite repo, with standalone fallback."""
+    for cand in (
+        Path(__file__).resolve().parent,
+        Path(__file__).resolve().parent.parent / "medtech-regulatory-compliance-suite",
+        Path(__file__).resolve().parent.parent.parent / "medtech-regulatory-compliance-suite",
+    ):
+        if cand.is_dir() and str(cand) not in sys.path:
+            sys.path.insert(0, str(cand))
+    try:
+        from legal_terms import append_terms_section_docx, append_terms_to_readme_xlsx, render_terms_txt
+        return append_terms_section_docx, append_terms_to_readme_xlsx, render_terms_txt
+    except ImportError:
+        pass
+
+    def _fallback_docx(doc: Document, track: str = "clinical_lit_prisma") -> None:
+        ph = doc.add_paragraph()
+        ph.paragraph_format.space_before = Pt(12)
+        rh = ph.add_run("TERMS OF SERVICE, REGULATORY SCOPE & LIABILITY DISCLAIMER")
+        rh.font.name = "Calibri"
+        rh.font.size = Pt(10.5)
+        rh.font.bold = True
+        pb = doc.add_paragraph()
+        rb = pb.add_run(
+            "Automated PRISMA 2020 screening and extraction draft under ALCOA+ and EU MDR Annex XIV rules. "
+            "Technical preparation aid only (not legal or medical advice); qualified RA/PRRC verification against "
+            "source publications required. Total provider liability is capped at fees actually paid. Governed by French law."
+        )
+        rb.font.name = "Calibri"
+        rb.font.size = Pt(8.5)
+
+    def _fallback_xlsx(ws_readme, border, bold_font, body_font, wrap_top, track: str = "clinical_lit_prisma") -> None:
+        ws_readme.append([
+            "Legal: Terms & Liability Disclaimer",
+            "Automated PRISMA 2020 draft for qualified RA/PRRC verification. Not legal/medical advice. Provider liability capped at fees paid; governed by French law.",
+        ])
+        rn = ws_readme.max_row
+        ws_readme.cell(row=rn, column=1).font = bold_font
+        ws_readme.cell(row=rn, column=1).border = border
+        ws_readme.cell(row=rn, column=1).alignment = wrap_top
+        ws_readme.cell(row=rn, column=2).font = body_font
+        ws_readme.cell(row=rn, column=2).border = border
+        ws_readme.cell(row=rn, column=2).alignment = wrap_top
+
+    def _fallback_txt(track: str = "clinical_lit_prisma") -> str:
+        return (
+            "PRISMA 2020 LITERATURE PACKAGE — TERMS OF SERVICE & LIABILITY DISCLAIMER\n"
+            "Automated literature screening draft for QA/RA verification against source publications.\n"
+            "Not legal or medical advice. Total liability capped at fees paid. Governed by French law.\n"
+        )
+
+    return _fallback_docx, _fallback_xlsx, _fallback_txt
 
 
 # ---------------------------------------------------------------------------
@@ -742,8 +800,11 @@ def generate_excel_xlsx(
         ws_readme.cell(row=rn, column=2).border = cell_border
         ws_readme.cell(row=rn, column=2).alignment = wrap_top
 
-    ws_readme.column_dimensions["A"].width = 28
-    ws_readme.column_dimensions["B"].width = 85
+    _, append_xlsx, _ = _load_pilot_legal_helpers()
+    append_xlsx(ws_readme, cell_border, bold_font, body_font, wrap_top, track="clinical_lit_prisma")
+
+    ws_readme.column_dimensions["A"].width = 30
+    ws_readme.column_dimensions["B"].width = 92
 
     wb.save(str(out_path))
 
@@ -855,6 +916,15 @@ def _draw_arrow(ax, x1: float, y1: float, x2: float, y2: float) -> None:
     )
 
 
+def _clean_prisma_reason(reason_txt: str) -> str:
+    """Normalize exclusion phrasing so PRISMA flowcharts stay executive-readable."""
+    r = str(reason_txt or "").strip()
+    m = re.match(r"^Outside top-(\d+) recency cohort cap$", r, re.I)
+    if m:
+        return f"Excluded beyond {m.group(1)}-study recency window"
+    return r
+
+
 def generate_prisma_flowchart(
     prisma: dict[str, Any],
     config: dict[str, Any],
@@ -948,7 +1018,7 @@ def generate_prisma_flowchart(
     # Screening Row 1 Right: Records excluded at title/abstract screening
     scr_lines = [f"Total excluded at screening (n = {prisma['excluded_at_screening']}):"]
     for reason, cnt in sorted(prisma["screening_reasons"].items(), key=lambda item: (-item[1], item[0])):
-        wrapped = textwrap.wrap(f"• {reason} (n = {cnt})", width=52)
+        wrapped = textwrap.wrap(f"• {_clean_prisma_reason(reason)} (n = {cnt})", width=52)
         scr_lines.extend(["  " + w_line if i > 0 else w_line for i, w_line in enumerate(wrapped)])
     if not prisma["screening_reasons"]:
         scr_lines = [f"Total excluded at title/abstract stage (n = {prisma['excluded_at_screening']})"]
@@ -981,7 +1051,7 @@ def generate_prisma_flowchart(
     # Screening Row 2 Right: Reports excluded at full-text with reasons
     ft_lines = [f"Total excluded at full-text review (n = {prisma['excluded_at_full_text']}):"]
     for reason, cnt in sorted(prisma["full_text_reasons"].items(), key=lambda item: (-item[1], item[0])):
-        wrapped = textwrap.wrap(f"• {reason} (n = {cnt})", width=52)
+        wrapped = textwrap.wrap(f"• {_clean_prisma_reason(reason)} (n = {cnt})", width=52)
         ft_lines.extend(["  " + w_line if i > 0 else w_line for i, w_line in enumerate(wrapped)])
     if not prisma["full_text_reasons"]:
         ft_lines = [f"Total excluded at full-text stage (n = {prisma['excluded_at_full_text']})"]
@@ -1014,9 +1084,16 @@ def generate_prisma_flowchart(
     )
 
     # Footer caption on figure
+    search_date_val = str(
+        config.get("date_of_search")
+        or config.get("search_date")
+        or dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    ).strip()
+    if not search_date_val or search_date_val in ("—", "-"):
+        search_date_val = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
     footer_note = (
-        f"Source: PRISMA 2020 statement | Search date: {config.get('date_of_search', '—')} | "
-        "Arithmetic conservation verified automatically."
+        f"Source: PRISMA 2020 statement | Search date: {search_date_val} | "
+        "Arithmetic verified automatically | kaledbouchagraoui7-bot.github.io/medtech-regulatory-compliance-suite"
     )
     if config.get("is_fictional_sample"):
         footer_note += " [FICTIONAL SAMPLE DATA FOR DEMO]"
@@ -1026,7 +1103,7 @@ def generate_prisma_flowchart(
         footer_note,
         ha="center",
         va="bottom",
-        fontsize=8.0,
+        fontsize=7.4,
         style="italic",
         color="#555555",
     )
@@ -1046,6 +1123,7 @@ def build_pilot_package(
     csv_path: str | Path,
     config_path: str | Path,
     base_output_dir: str | Path = "output",
+    include_legal_files: bool = False,
 ) -> dict[str, Path]:
     """Load inputs, verify PRISMA conservation, build Word, Excel, PNG, PDF,
     and zip them into `output/<project_slug>_pilot.zip`."""
@@ -1068,20 +1146,29 @@ def build_pilot_package(
     generate_excel_xlsx(records, config, prisma, xlsx_path)
     generate_prisma_flowchart(prisma, config, png_path, pdf_path)
 
-    zip_path = base_out / f"{slug}_pilot.zip"
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for file_p in (docx_path, xlsx_path, png_path, pdf_path):
-            zf.write(file_p, arcname=f"{slug}_pilot/{file_p.name}")
-
-    return {
+    zip_members = [docx_path, xlsx_path, png_path, pdf_path]
+    out_dict: dict[str, Any] = {
         "package_dir": pkg_dir,
         "docx": docx_path,
         "xlsx": xlsx_path,
         "png": png_path,
         "pdf": pdf_path,
-        "zip": zip_path,
         "prisma": prisma,
     }
+    if include_legal_files:
+        _, _, render_txt = _load_pilot_legal_helpers()
+        terms_path = pkg_dir / "TERMS_OF_SERVICE_AND_DISCLAIMER.txt"
+        terms_path.write_text(render_txt(track="clinical_lit_prisma"), encoding="utf-8")
+        zip_members.append(terms_path)
+        out_dict["terms"] = terms_path
+
+    zip_path = base_out / f"{slug}_pilot.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_p in zip_members:
+            zf.write(file_p, arcname=f"{slug}_pilot/{file_p.name}")
+
+    out_dict["zip"] = zip_path
+    return out_dict
 
 
 def main(argv: list[str] | None = None) -> int:
