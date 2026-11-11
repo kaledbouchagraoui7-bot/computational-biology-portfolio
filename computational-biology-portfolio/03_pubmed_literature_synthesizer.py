@@ -53,7 +53,7 @@ from pilot_package_generator import (
 # ---------------------------------------------------------------------------
 # Configuration & NCBI Entrez courtesy contact
 # ---------------------------------------------------------------------------
-DEFAULT_ENTREZ_EMAIL = "regulatory-intelligence@cogops-group.ch"
+DEFAULT_ENTREZ_EMAIL = "kaledbouchagraoui7@gmail.com"
 DEFAULT_ENTREZ_TOOL = "regulatory-literature-synthesizer"
 
 MAX_REQUESTS_PER_SEC = 3          # NCBI courtesy limit without API key

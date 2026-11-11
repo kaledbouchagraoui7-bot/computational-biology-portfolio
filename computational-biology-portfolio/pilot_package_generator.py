@@ -294,6 +294,117 @@ def format_vancouver_reference(record: dict[str, str]) -> str:
     return cite
 
 
+def _classify_rob_tool(study_type: str) -> str:
+    """Map study design strictly to established Cochrane/EQUATOR methodological frameworks."""
+    st = (study_type or "").lower()
+    if any(k in st for k in ("random", "rct", "clinical trial")):
+        return "Cochrane RoB 2"
+    if any(k in st for k in ("meta", "systematic", "review", "network")):
+        return "AMSTAR 2 / ROBIS"
+    if any(k in st for k in ("cohort", "observational", "registry", "retrospective", "prospective", "case-control", "case control", "real-world")):
+        return "ROBINS-I / Newcastle-Ottawa"
+    if any(k in st for k in ("case report", "case series")):
+        return "CARE / JBI Case Appraisal"
+    return "Study-Design Specific QA Checklist"
+
+
+def summarize_rob_framework(records: list[dict[str, str]]) -> dict[str, Any]:
+    """Summarize applicable methodological appraisal tools for included studies (no invented ratings)."""
+    included = [r for r in records if r.get("screening_stage") == "included"]
+    counts = Counter(_classify_rob_tool(r.get("study_type", "")) for r in included)
+    parts = [f"{tool}: {cnt} studies" for tool, cnt in counts.most_common()]
+    summary = (
+        f"Methodological appraisal scope across {len(included)} included study/studies: "
+        + ("; ".join(parts) if parts else "None included")
+        + ". Zero automated bias ratings invented; qualified reviewer appraisal required."
+    )
+    return {
+        "included_count": len(included),
+        "distribution": dict(counts),
+        "framework_summary": summary,
+    }
+
+
+def export_ris_and_bib(records: list[dict[str, str]], out_dir: Path, slug: str) -> tuple[Path, Path]:
+    """Export included studies (without fabricating missing DOIs) to `.ris` and `.bib` files."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target_recs = [r for r in records if r.get("screening_stage") == "included"]
+    if not target_recs:
+        target_recs = [r for r in records if r.get("screening_stage") != "identified"]
+
+    ris_lines: list[str] = []
+    bib_entries: list[str] = []
+    used_keys: set[str] = set()
+
+    for idx, rec in enumerate(target_recs, start=1):
+        rec_id = (rec.get("record_id") or f"REC{idx:03d}").strip()
+        title = (rec.get("title") or "").strip() or "Untitled study"
+        authors_raw = (rec.get("authors") or "").strip()
+        author_list = [a.strip() for a in re.split(r"[;]", authors_raw) if a.strip()]
+        if len(author_list) == 1 and "," in author_list[0]:
+            # Comma-separated author strings like "Smith J, Lee K" or "Doe A., Roe B."
+            parts = [p.strip() for p in author_list[0].split(",") if p.strip()]
+            if len(parts) > 1:
+                author_list = parts
+        year = (rec.get("year") or "").strip()
+        journal = (rec.get("journal") or "").strip()
+        doi = (rec.get("doi") or "").strip()
+        conclusion = (rec.get("conclusion") or "").strip()
+        study_type = (rec.get("study_type") or "").strip()
+
+        ris_lines.append("TY  - JOUR")
+        ris_lines.append(f"ID  - {rec_id}")
+        ris_lines.append(f"TI  - {title}")
+        for au in author_list:
+            ris_lines.append(f"AU  - {au}")
+        if year:
+            ris_lines.append(f"PY  - {year}")
+        if journal:
+            ris_lines.append(f"JO  - {journal}")
+        if doi:
+            ris_lines.append(f"DO  - {doi}")
+        if study_type:
+            ris_lines.append(f"M3  - {study_type}")
+        if conclusion:
+            ris_lines.append(f"N1  - Extracted conclusion: {conclusion}")
+        ris_lines.append("ER  - ")
+        ris_lines.append("")
+
+        base_key = re.sub(r"[^A-Za-z0-9]+", "", rec_id) or f"Ref{idx}"
+        bib_key = base_key
+        suffix = 2
+        while bib_key in used_keys:
+            bib_key = f"{base_key}_{suffix}"
+            suffix += 1
+        used_keys.add(bib_key)
+
+        def _bib_esc(val: str) -> str:
+            return val.replace("{", "(").replace("}", ")")
+
+        fields = [
+            f"  title = {{{_bib_esc(title)}}}",
+        ]
+        if author_list:
+            fields.append(f"  author = {{{_bib_esc(' and '.join(author_list))}}}")
+        if journal:
+            fields.append(f"  journal = {{{_bib_esc(journal)}}}")
+        if year:
+            fields.append(f"  year = {{{_bib_esc(year)}}}")
+        if doi:
+            fields.append(f"  doi = {{{_bib_esc(doi)}}}")
+        if study_type:
+            fields.append(f"  note = {{Study Type: {_bib_esc(study_type)}; Record ID: {_bib_esc(rec_id)}}}")
+        else:
+            fields.append(f"  note = {{Record ID: {_bib_esc(rec_id)}}}")
+        bib_entries.append(f"@article{{{bib_key},\n" + ",\n".join(fields) + "\n}")
+
+    ris_path = out_dir / f"{slug}_references.ris"
+    bib_path = out_dir / f"{slug}_references.bib"
+    ris_path.write_text("\n".join(ris_lines), encoding="utf-8")
+    bib_path.write_text("\n\n".join(bib_entries) + ("\n" if bib_entries else ""), encoding="utf-8")
+    return ris_path, bib_path
+
+
 # ---------------------------------------------------------------------------
 # 2. Output 1: Word (.docx) Evidence Table Generator
 # ---------------------------------------------------------------------------
@@ -407,6 +518,7 @@ def generate_word_docx(
             f"Full-Text Assessed: {prisma['reports_assessed_full_text']} | "
             f"Included Studies: {prisma['studies_included']}",
         ),
+        ("Methodological Appraisal Scope", summarize_rob_framework(records)["framework_summary"]),
     ]
 
     for label, val in meta_items:
@@ -788,6 +900,7 @@ def generate_excel_xlsx(
         ("Sheet: Records", "Complete table of all identified, screened, full-text assessed, and included records. Frozen header row and AutoFilter enabled on all columns. DOIs are formatted as clickable hyperlinks."),
         ("Sheet: PRISMA_Counts", "Exact stage-by-stage numbers feeding the PRISMA 2020 flow diagram, verified for mathematical conservation."),
         ("Sheet: Exclusion_Reasons", "Breakdown of excluded records by screening stage and specific exclusion reason using live Excel COUNTIFS formulas."),
+        ("Methodological Appraisal (RoB)", summarize_rob_framework(records)["framework_summary"]),
         ("Integrity & Highlighting Rule", "No citations, DOIs, or conclusions are ever fabricated. Any missing field is left blank, highlighted in soft yellow (#FFF2CC), and flagged in the 'needs_verification' column for manual QA check against the source publication."),
     ]
     for r in readme_rows:
@@ -1145,6 +1258,7 @@ def build_pilot_package(
     generate_word_docx(records, config, prisma, docx_path)
     generate_excel_xlsx(records, config, prisma, xlsx_path)
     generate_prisma_flowchart(prisma, config, png_path, pdf_path)
+    ris_path, bib_path = export_ris_and_bib(records, pkg_dir, slug)
 
     zip_members = [docx_path, xlsx_path, png_path, pdf_path]
     out_dict: dict[str, Any] = {
@@ -1153,13 +1267,15 @@ def build_pilot_package(
         "xlsx": xlsx_path,
         "png": png_path,
         "pdf": pdf_path,
+        "ris": ris_path,
+        "bib": bib_path,
         "prisma": prisma,
     }
     if include_legal_files:
         _, _, render_txt = _load_pilot_legal_helpers()
         terms_path = pkg_dir / "TERMS_OF_SERVICE_AND_DISCLAIMER.txt"
         terms_path.write_text(render_txt(track="clinical_lit_prisma"), encoding="utf-8")
-        zip_members.append(terms_path)
+        zip_members.extend([terms_path, ris_path, bib_path])
         out_dict["terms"] = terms_path
 
     zip_path = base_out / f"{slug}_pilot.zip"

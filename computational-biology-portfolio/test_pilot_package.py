@@ -15,6 +15,7 @@ from pilot_package_generator import (
     compute_and_verify_prisma,
     generate_prisma_flowchart,
     load_inputs,
+    summarize_rob_framework,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -67,7 +68,22 @@ class TestPilotPackageGenerator(unittest.TestCase):
         self.assertTrue(res["xlsx"].exists())
         self.assertTrue(res["png"].exists())
         self.assertTrue(res["pdf"].exists())
+        self.assertTrue(res["ris"].exists())
+        self.assertTrue(res["bib"].exists())
         self.assertTrue(res["zip"].exists())
+
+        ris_txt = res["ris"].read_text(encoding="utf-8")
+        bib_txt = res["bib"].read_text(encoding="utf-8")
+        self.assertEqual(ris_txt.count("TY  - JOUR"), 14)
+        self.assertEqual(bib_txt.count("@article{"), 14)
+        # Ensure SIM-005 missing DOI is not fabricated in BibTeX/RIS
+        self.assertIn("SIM005", bib_txt)
+        sim005_block = bib_txt.split("@article{SIM005,")[1].split("\n}")[0]
+        self.assertNotIn("doi =", sim005_block)
+
+        rob = summarize_rob_framework(self.records)
+        self.assertEqual(rob["included_count"], 14)
+        self.assertIn("Cochrane RoB 2", rob["distribution"])
 
         # Verify Word (.docx)
         doc = docx.Document(str(res["docx"]))
@@ -139,6 +155,17 @@ class TestPilotPackageGenerator(unittest.TestCase):
             generate_prisma_flowchart(prisma, cfg_no_date, png_out, pdf_out)
             self.assertTrue(png_out.exists() and png_out.stat().st_size > 20000)
             self.assertTrue(pdf_out.exists() and pdf_out.stat().st_size > 5000)
+
+    def test_commercial_zip_includes_legal_ris_and_bib(self) -> None:
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="pilot_legal_zip_") as td:
+            res = build_pilot_package(self.csv_path, self.cfg_path, td, include_legal_files=True)
+            with zipfile.ZipFile(res["zip"], "r") as zf:
+                names = zf.namelist()
+                self.assertEqual(len(names), 7)
+                self.assertTrue(any(n.endswith(".ris") for n in names))
+                self.assertTrue(any(n.endswith(".bib") for n in names))
+                self.assertTrue(any(n.endswith("TERMS_OF_SERVICE_AND_DISCLAIMER.txt") for n in names))
 
 
 if __name__ == "__main__":
