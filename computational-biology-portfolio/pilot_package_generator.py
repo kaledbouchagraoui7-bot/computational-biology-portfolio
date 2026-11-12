@@ -1039,6 +1039,39 @@ def _clean_prisma_reason(reason_txt: str) -> str:
     return r
 
 
+def _resolve_footer_domain(config: dict[str, Any] | None = None) -> str:
+    """Resolve optional clean custom domain for PRISMA chart footers (never emits -bot.github.io)."""
+    cand = ""
+    if isinstance(config, dict):
+        cand = str(config.get("custom_domain") or "").strip()
+    if not cand:
+        cand = os.environ.get("SENTINEL_CUSTOM_DOMAIN", "").strip()
+    if not cand:
+        for base in (
+            Path(__file__).resolve().parent,
+            Path(__file__).resolve().parent.parent,
+            Path(__file__).resolve().parent.parent / "medtech-regulatory-compliance-suite",
+        ):
+            cfg_p = base / "client_ops_config.json"
+            if cfg_p.is_file():
+                try:
+                    data = json.loads(cfg_p.read_text(encoding="utf-8"))
+                    prov = data.get("provider", {}) if isinstance(data, dict) else {}
+                    raw = str(prov.get("custom_domain") or "").strip()
+                    if not raw:
+                        w = str(prov.get("website_url") or "").strip()
+                        if w and "kaledbouchagraoui7-bot" not in w.lower():
+                            raw = w
+                    if raw:
+                        cand = raw
+                        break
+                except Exception:
+                    continue
+    if not cand or "kaledbouchagraoui7-bot" in cand.lower():
+        return ""
+    return re.sub(r"^https?://", "", cand, flags=re.I).strip().rstrip("/")
+
+
 def generate_prisma_flowchart(
     prisma: dict[str, Any],
     config: dict[str, Any],
@@ -1205,10 +1238,10 @@ def generate_prisma_flowchart(
     ).strip()
     if not search_date_val or search_date_val in ("—", "-"):
         search_date_val = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
-    footer_note = (
-        f"Source: PRISMA 2020 statement | Search date: {search_date_val} | "
-        "Arithmetic verified automatically | kaledbouchagraoui7-bot.github.io/medtech-regulatory-compliance-suite"
-    )
+    custom_dom = _resolve_footer_domain(config)
+    footer_note = f"Source: PRISMA 2020 statement | Search date: {search_date_val} | Arithmetic verified automatically"
+    if custom_dom:
+        footer_note += f" | {custom_dom}"
     if config.get("is_fictional_sample"):
         footer_note += " [FICTIONAL SAMPLE DATA FOR DEMO]"
     ax.text(
