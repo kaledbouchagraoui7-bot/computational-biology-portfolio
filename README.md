@@ -8,7 +8,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaledbouchagraoui7-bot/computational-biology-portfolio/blob/main/computational-biology-portfolio/02_clinical_trial_eda.ipynb)
 
-> **100% Free & Open-Source (MIT):** Designed for university researchers, students, medical writers, and small clinical teams needing reproducible PRISMA 2020 screening matrices, ICH E9 baseline statistics, and version-pinned NCBI sequence checks — zero paid APIs required.
+> **100% Free & Open-Source (MIT) · Zero-Install Demo:** Built by a 17-year-old high-school student in France for researchers, students, and medical writers needing reproducible PRISMA 2020 mechanical prep, ICH E9 baseline statistics, and version-pinned NCBI sequence checks. **[Try the Zero-Install Browser Web Demo](https://kaledbouchagraoui7-bot.github.io/computational-biology-portfolio/)** (runs directly in your browser against PubMed & Europe PMC with pre-loaded benchmark datasets).
 
 ---
 
@@ -38,8 +38,9 @@ This repository automates the three highest-friction mechanical workflows in **c
 - **Full Documentation & Quickstart:** [`computational-biology-portfolio/README.md`](computational-biology-portfolio/README.md)
 - **Regulatory & Privacy Compliance Framework:** [`LEGAL_COMPLIANCE_AND_ETHICS.md`](LEGAL_COMPLIANCE_AND_ETHICS.md)
 
-## Public Dataset Case Study
+## Public Dataset Case Studies & Empirical Ground-Truth Benchmark
 
+- **[Case Study 02 — Ground-Truth Benchmark vs. Published Review (`PMC13739473`)](computational-biology-portfolio/case_studies/02_published_prisma_ground_truth_benchmark.md)**: Re-runs the exact published PubMed query from *Sports genomics research in Turkish athlete populations (2019–2026)* (`226` vs. `225` reported MEDLINE records, `99.56%` match), deduplicates `422` combined PubMed + Europe PMC records down to `251` unique records, and documents why human full-text eligibility screening remains mandatory.
 - **[Case Study 01 — GLP-1 Cardiorenal PRISMA 2020 Screening Audit (`135 -> 25` studies)](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.md)** · ([Reproducible Notebook](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.ipynb)): Dual-database PubMed + Europe PMC retrieval (`11` duplicates stripped; automates mechanical prep & count accounting only — not a standalone systematic review) paired with an explicit clinical false-positive precision audit.
 
 ## Quickstart

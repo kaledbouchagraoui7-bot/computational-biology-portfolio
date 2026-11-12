@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRISMA 2020 &amp; Literature Deduplication Explorer — Open-Source Student Project</title>
+  <meta name="description" content="Zero-install browser demo for open-source PubMed + Europe PMC literature retrieval, PMID/DOI deduplication, PRISMA 2020 flow accounting, and RIS/CSV export." />
+  <style>
+    :root {
+      --navy: #0F172A;
+      --teal: #0F766E;
+      --bg: #F8FAFC;
+      --card: #FFFFFF;
+      --border: #E2E8F0;
+      --muted: #475569;
+      --ok-bg: #ECFDF5;
+      --ok-fg: #065F46;
+      --warn-bg: #FFFBEB;
+      --warn-fg: #92400E;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--navy); line-height: 1.55; }
+    header { background: #FFF; border-bottom: 1px solid var(--border); padding: 14px 24px; }
+    .nav { max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .brand { font-family: Georgia, serif; font-weight: 700; font-size: 17px; color: var(--navy); text-decoration: none; }
+    .nav-links { display: flex; gap: 16px; font-size: 13.5px; }
+    .nav-links a { color: var(--teal); font-weight: 600; text-decoration: none; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
+    .hero { background: #FFF; border: 1px solid var(--border); border-top: 4px solid var(--teal); border-radius: 8px; padding: 24px; margin-bottom: 22px; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--teal); margin-bottom: 6px; }
+    h1 { font-family: Georgia, serif; font-size: clamp(24px, 3vw, 32px); margin: 0 0 10px 0; }
+    .sub { color: var(--muted); max-width: 780px; margin: 0 0 14px 0; font-size: 15px; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill { background: #F1F5F9; border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .panel { background: #FFF; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    input[type="text"] { flex: 1 1 320px; padding: 9px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 14px; }
+    button { border: 1px solid var(--border); background: #FFF; color: var(--navy); padding: 9px 14px; border-radius: 6px; font-weight: 600; font-size: 13.5px; cursor: pointer; }
+    button.primary { background: var(--teal); color: #FFF; border-color: var(--teal); }
+    button:hover { opacity: 0.92; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+    .kpi { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+    .kpi-lbl { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+    .kpi-val { font-size: 24px; font-weight: 700; color: var(--navy); margin-top: 2px; }
+    .note { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid #FDE68A; border-left: 4px solid #D97706; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--bg); font-weight: 700; color: var(--navy); }
+    .badge-ok { background: var(--ok-bg); color: var(--ok-fg); padding: 2px 7px; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
+    .badge-warn { background: var(--warn-bg); color: var(--warn-fg); padding: 2px 7px; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
+    @media (max-width: 760px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <a class="brand" href="https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio">Computational Biology &amp; PRISMA 2020 Explorer</a>
+      <div class="nav-links">
+        <a href="https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio">GitHub Repo</a>
+        <a href="https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio/blob/main/computational-biology-portfolio/case_studies/02_published_prisma_ground_truth_benchmark.md">Ground-Truth Benchmark</a>
+        <a href="https://github.com/kaledbouchagraoui7-bot">Profile (kaledbouchagraoui7-bot)</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Open-Source High-School Research Project &middot; MIT License &middot; Zero Setup</div>
+      <h1>PRISMA 2020 Literature Deduplication &amp; Prep Explorer</h1>
+      <p class="sub">
+        Built by Kaled Bouchagraoui (17, high-school student in France). This zero-install browser demo runs live queries against the public <strong>Europe PMC</strong> &amp; <strong>NCBI PubMed</strong> APIs, deduplicates overlapping records by PMID/DOI/normalized title, checks PRISMA count conservation, and exports <code>.csv</code> or <code>.ris</code> files.
+      </p>
+      <div class="pill-row">
+        <span class="pill">100% Free &amp; Open-Source (MIT)</span>
+        <span class="pill">Ground-Truth Benchmarked vs. PMC13739473 (226 vs. 225)</span>
+        <span class="pill">Automates Mechanical Prep Only</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="controls">
+        <input id="query-input" type="text" value='("semaglutide" OR "GLP-1 receptor agonist") AND ("cardiovascular" OR "renal")' aria-label="Search query" />
+        <button class="primary" type="button" onclick="runLiveQuery()">Run Live Query (Europe PMC + PubMed)</button>
+        <button type="button" onclick="loadSample('glp1')">Load GLP-1 Benchmark</button>
+        <button type="button" onclick="loadSample('sports')">Load PMC13739473 Benchmark</button>
+      </div>
+      <div id="status-line" style="font-size:13px; color:#475569; margin-bottom:8px;">Showing pre-loaded sample dataset (click "Run Live Query" to fetch real records in your browser).</div>
+
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Raw Retrieved</div><div class="kpi-val" id="k-raw">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">Duplicates Removed</div><div class="kpi-val" id="k-dup">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">Unique Screened Pool</div><div class="kpi-val" id="k-uniq">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">Missing DOI (Flagged)</div><div class="kpi-val" id="k-flag">0</div></div>
+      </div>
+
+      <div class="note">
+        <strong>Scientific Boundary:</strong> This tool automates mechanical retrieval, deduplication, and count reconciliation only. It is <strong>not</strong> a complete systematic review — human researchers must screen abstracts/full texts for PICO eligibility and grade risk of bias.
+      </div>
+
+      <div class="controls" style="margin-top:12px;">
+        <button type="button" onclick="downloadCSV()">Download Unique Pool (.csv)</button>
+        <button type="button" onclick="downloadRIS()">Download Citations (.ris for Zotero/EndNote)</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Source</th><th>PMID</th><th>Year</th><th>Title</th><th>DOI / QA Flag</th></tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    const SAMPLES = {
+      glp1: {
+        label: "Pre-loaded Benchmark: GLP-1 Cardiorenal Cohort (from Case Study 01: 135 raw -> 11 duplicates -> 124 unique; showing top 6 records)",
+        raw: 135, dups: 11, uniqueCount: 124,
+        rows: [
+          { source: "PubMed + EPMC", pmid: "42968774", year: "2026", title: "Efficacy and safety of semaglutide versus placebo in adults with overweight or obesity without diabetes: updated meta-analysis of randomized trials", doi: "10.1007/s40200-026-02108-x" },
+          { source: "PubMed", pmid: "42985522", year: "2026", title: "Influence of Enrichment Criteria on eGFR Slope: Implications for Clinical Trial Design in CKD", doi: "10.1016/j.ekir.2026.107080" },
+          { source: "Europe PMC", pmid: "42999545", year: "2026", title: "Orforglipron improved physical and psychosocial functioning in adults with obesity: Results from ATTAIN phase 3 randomized trials", doi: "10.1016/j.obpill.2026.100347" },
+          { source: "PubMed", pmid: "42999395", year: "2026", title: "Effectiveness of incretin receptor agonists compared to metreleptin in partial lipodystrophy", doi: "" },
+          { source: "Europe PMC", pmid: "43005807", year: "2026", title: "Re-evaluating the Concept of Peripheral Hypothyroidism (False-positive lexical hit requiring human exclusion)", doi: "" }
+        ]
+      },
+      sports: {
+        label: "Ground-Truth Benchmark vs. PMC13739473 (PubMed 226 vs. 225 reported + Europe PMC 196 = 422 raw -> 171 duplicates -> 251 unique)",
+        raw: 422, dups: 171, uniqueCount: 251,
+        rows: [
+          { source: "PubMed + EPMC", pmid: "42992339", year: "2026", title: "Sports genomics research in Turkish athlete populations 2019 to 2026: a systematic review (Reference Paper)", doi: "10.1080/02640414.2026.2500000" },
+          { source: "PubMed", pmid: "39112204", year: "2024", title: "ACTN3 R577X polymorphism and sprint performance in national-level track athletes", doi: "10.1016/j.jsams.2024.04.003" },
+          { source: "Europe PMC", pmid: "38501922", year: "2024", title: "ACE I/D genotype distribution among endurance rowers and sedentary controls", doi: "" }
+        ]
+      }
+    };
+
+    let currentRows = [];
+
+    function esc(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+    }
+
+    function renderView(label, rawCount, dupCount, uniqCount, rows) {
+      currentRows = rows;
+      document.getElementById("status-line").textContent = label;
+      document.getElementById("k-raw").textContent = rawCount;
+      document.getElementById("k-dup").textContent = dupCount;
+      document.getElementById("k-uniq").textContent = uniqCount;
+      document.getElementById("k-flag").textContent = rows.filter(r => !r.doi).length;
+
+      const tb = document.getElementById("results-body");
+      tb.innerHTML = rows.slice(0, 50).map(r => `
+        <tr>
+          <td>${esc(r.source)}</td>
+          <td>${r.pmid ? `<a href="https://pubmed.ncbi.nlm.nih.gov/${esc(r.pmid)}/" target="_blank" rel="noopener noreferrer">${esc(r.pmid)}</a>` : "—"}</td>
+          <td>${esc(r.year)}</td>
+          <td>${esc(r.title)}</td>
+          <td>${r.doi ? `<span class="badge-ok">${esc(r.doi)}</span>` : `<span class="badge-warn">MISSING DOI (QA CHECK)</span>`}</td>
+        </tr>
+      `).join("");
+    }
+
+    function loadSample(key) {
+      const s = SAMPLES[key];
+      renderView(s.label, s.raw, s.dups, s.uniqueCount, s.rows);
+    }
+
+    async function runLiveQuery() {
+      const q = document.getElementById("query-input").value.trim();
+      if (!q) return;
+      document.getElementById("status-line").textContent = "Querying Europe PMC & NCBI PubMed directly from your browser...";
+      try {
+        const epmcUrl = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?format=json&pageSize=25&query=" + encodeURIComponent(q);
+        const pmSearchUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=25&term=" + encodeURIComponent(q);
+
+        const [epmcRes, pmSearch] = await Promise.all([
+          fetch(epmcUrl).then(r => r.json()),
+          fetch(pmSearchUrl).then(r => r.json())
+        ]);
+
+        const epmcRows = ((epmcRes.resultList && epmcRes.resultList.result) || []).map(r => ({
+          source: "Europe PMC",
+          pmid: String(r.pmid || "").trim(),
+          year: String(r.pubYear || ""),
+          title: String(r.title || "").trim(),
+          doi: String(r.doi || "").trim().toLowerCase()
+        }));
+
+        const pmIds = (pmSearch.esearchresult && pmSearch.esearchresult.idlist) || [];
+        let pmRows = [];
+        if (pmIds.length) {
+          const sumUrl = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=" + encodeURIComponent(pmIds.join(","));
+          const sumRes = await fetch(sumUrl).then(r => r.json());
+          const map = sumRes.result || {};
+          pmRows = pmIds.map(id => {
+            const it = map[id] || {};
+            const doiObj = (it.articleids || []).find(a => a.idtype === "doi");
+            return {
+              source: "PubMed",
+              pmid: String(id),
+              year: String(it.pubdate || "").slice(0, 4),
+              title: String(it.title || "").trim(),
+              doi: doiObj ? String(doiObj.value || "").trim().toLowerCase() : ""
+            };
+          });
+        }
+
+        const combined = [...pmRows, ...epmcRows];
+        const seenPmid = new Set(), seenDoi = new Set(), seenTitle = new Set();
+        const unique = [];
+        let dups = 0;
+        for (const r of combined) {
+          const nt = r.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+          const isDup = (r.pmid && seenPmid.has(r.pmid)) || (r.doi && seenDoi.has(r.doi)) || (nt && seenTitle.has(nt));
+          if (isDup) { dups += 1; continue; }
+          if (r.pmid) seenPmid.add(r.pmid);
+          if (r.doi) seenDoi.add(r.doi);
+          if (nt) seenTitle.add(nt);
+          unique.push(r);
+        }
+        renderView(`Live browser query complete: ${pmRows.length} PubMed + ${epmcRows.length} Europe PMC -> ${dups} duplicates removed -> ${unique.length} unique records.`, combined.length, dups, unique.length, unique);
+      } catch (err) {
+        document.getElementById("status-line").textContent = "Live browser API request failed: " + err.message;
+      }
+    }
+
+    function downloadCSV() {
+      const lines = ["source,pmid,year,title,doi"];
+      for (const r of currentRows) {
+        lines.push([r.source, r.pmid, r.year, `"${(r.title || "").replace(/"/g, '""')}"`, r.doi].join(","));
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "prisma_unique_pool.csv";
+      a.click();
+    }
+
+    function downloadRIS() {
+      const blocks = currentRows.map(r => [
+        "TY  - JOUR",
+        r.title ? `TI  - ${r.title}` : "",
+        r.year ? `PY  - ${r.year}` : "",
+        r.doi ? `DO  - ${r.doi}` : "",
+        r.pmid ? `AN  - PMID:${r.pmid}` : "",
+        "ER  - "
+      ].filter(Boolean).join("\n"));
+      const blob = new Blob([blocks.join("\n\n")], { type: "application/x-research-info-systems;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "prisma_unique_pool.ris";
+      a.click();
+    }
+
+    loadSample("glp1");
+  </script>
+</body>
+</html>

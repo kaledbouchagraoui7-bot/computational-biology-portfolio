@@ -1,0 +1,21 @@
+{
+  "benchmark_utc": "2026-11-12T20:20:09Z",
+  "reference_paper": {
+    "pmcid": "PMC13739473",
+    "pmid": "42992339",
+    "title": "Sports genomics research in Turkish athlete populations 2019 to 2026: a systematic review",
+    "published_pubmed_count": 225,
+    "published_all_7_db_identified": 1740,
+    "published_all_7_db_unique": 1023,
+    "published_included_from_db": 61
+  },
+  "pipeline_reproduction": {
+    "pubmed_live_count": 226,
+    "pubmed_delta_vs_paper": 1,
+    "europe_pmc_live_count": 196,
+    "combined_raw": 422,
+    "duplicates_removed": 171,
+    "unique_pool": 251,
+    "title_turkish_keyword_hits_sample": 5
+  }
+}
