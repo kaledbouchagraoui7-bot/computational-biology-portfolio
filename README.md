@@ -38,6 +38,10 @@ This repository automates the three highest-friction mechanical workflows in **c
 - **Full Documentation & Quickstart:** [`computational-biology-portfolio/README.md`](computational-biology-portfolio/README.md)
 - **Regulatory & Privacy Compliance Framework:** [`LEGAL_COMPLIANCE_AND_ETHICS.md`](LEGAL_COMPLIANCE_AND_ETHICS.md)
 
+## Public Dataset Case Study
+
+- **[Case Study 01 — GLP-1 Cardiorenal PRISMA 2020 Screening Audit (`135 -> 25` studies)](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.md)** · ([Reproducible Notebook](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.ipynb)): Dual-database PubMed + Europe PMC retrieval (`11` cross-database duplicates stripped, `0` arithmetic conservation drift) paired with an explicit clinical false-positive precision audit.
+
 ## Quickstart
 
 ```bash

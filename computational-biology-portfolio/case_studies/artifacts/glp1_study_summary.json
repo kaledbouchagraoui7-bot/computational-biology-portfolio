@@ -1,0 +1,123 @@
+{
+  "query": "(\"semaglutide\" OR \"GLP-1 receptor agonist\") AND (\"cardiovascular\" OR \"renal\") AND (\"clinical trial\" OR \"meta-analysis\")",
+  "databases_searched": {
+    "Europe PMC REST": 75,
+    "NCBI PubMed E-utilities": 60
+  },
+  "curate_stats": {
+    "identified_raw": 135,
+    "duplicates_removed": 11,
+    "screened": 124,
+    "excluded_missing_content": 2,
+    "excluded_prior_to_window": 0,
+    "excluded_beyond_cap": 97,
+    "included_final": 25,
+    "surveillance_window": "2021\u20132026"
+  },
+  "prisma_verified": {
+    "total_identified": 135,
+    "db_breakdown": {
+      "Europe PMC REST": 75,
+      "NCBI PubMed E-utilities": 60
+    },
+    "duplicates_removed": 11,
+    "records_screened": 124,
+    "excluded_at_screening": 2,
+    "screening_reasons": {
+      "Missing or incomplete abstract text": 2
+    },
+    "reports_assessed_full_text": 122,
+    "excluded_at_full_text": 97,
+    "full_text_reasons": {
+      "Excluded beyond 25-study recency window": 97
+    },
+    "all_exclusion_reasons": {
+      "Excluded beyond 25-study recency window": 97,
+      "Missing or incomplete abstract text": 2,
+      "Duplicate record": 11
+    },
+    "studies_included": 25
+  },
+  "top_included_studies": [
+    {
+      "pmid": "43005807",
+      "year": "2027",
+      "journal": "",
+      "study_type": null,
+      "title": "Re-evaluating the Concept of Peripheral Hypothyroidism.",
+      "doi": "10.5812/ijem-173643"
+    },
+    {
+      "pmid": "42948641",
+      "year": "2027",
+      "journal": "",
+      "study_type": null,
+      "title": "The gut-brain axis in Binge Eating Disorder: From microbial dysbiosis to vagal dysfunction and therapeutic intervention.",
+      "doi": "10.1080/29933935.2026.2749978"
+    },
+    {
+      "pmid": "42927270",
+      "year": "2027",
+      "journal": "",
+      "study_type": null,
+      "title": "Metformin Use Is Associated With Reduced Rates of Primary Nerve Decompression Surgery and Revision in Type 2 Diabetes: A Retrospective Cohort Study.",
+      "doi": "10.1016/j.jhsg.2026.101148"
+    },
+    {
+      "pmid": "43012350",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "A Murinized Bimagrumab Analogue Increases Skeletal Muscle Mass and Improves Cardiometabolic Remodelling in Experimental Hypertrophic Cardiomyopathy.",
+      "doi": "10.1002/jcsm.70420"
+    },
+    {
+      "pmid": "42999545",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "Orforglipron improved physical and psychosocial functioning in adults with obesity: Results from ATTAIN phase 3 randomized trials.",
+      "doi": "10.1016/j.obpill.2026.100347"
+    },
+    {
+      "pmid": "42999395",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "Effectiveness of incretin receptor agonists compared to metreleptin in partial lipodystrophy: a retrospective study.",
+      "doi": "10.1210/jendso/bvag248"
+    },
+    {
+      "pmid": "42991981",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "Symptom improvement was not significantly associated with weight loss, dose, or treatment duration in women with lipoedema treated with tirzepatide: a retrospective cohort study of prospectively collected outcomes.",
+      "doi": "10.1016/j.metop.2026.100518"
+    },
+    {
+      "pmid": "42985522",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "Influence of Enrichment Criteria on eGFR Slope: Implications for Clinical Trial Design in CKD.",
+      "doi": "10.1016/j.ekir.2026.107080"
+    },
+    {
+      "pmid": "42968774",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "Efficacy and safety of semaglutide versus placebo in adults with overweight or obesity without diabetes: updated meta-analysis of randomized trials.",
+      "doi": "10.1007/s40200-026-02108-x"
+    },
+    {
+      "pmid": "42960245",
+      "year": "2026",
+      "journal": "",
+      "study_type": null,
+      "title": "The pharmacist's role in enhancing adherence to GLP1 based anti-obesity medications through comprehensive side effect management.",
+      "doi": "10.1016/j.rcsop.2026.100867"
+    }
+  ]
+}
