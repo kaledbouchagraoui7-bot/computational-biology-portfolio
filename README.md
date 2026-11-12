@@ -40,7 +40,7 @@ This repository automates the three highest-friction mechanical workflows in **c
 
 ## Public Dataset Case Study
 
-- **[Case Study 01 — GLP-1 Cardiorenal PRISMA 2020 Screening Audit (`135 -> 25` studies)](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.md)** · ([Reproducible Notebook](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.ipynb)): Dual-database PubMed + Europe PMC retrieval (`11` cross-database duplicates stripped, `0` arithmetic conservation drift) paired with an explicit clinical false-positive precision audit.
+- **[Case Study 01 — GLP-1 Cardiorenal PRISMA 2020 Screening Audit (`135 -> 25` studies)](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.md)** · ([Reproducible Notebook](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.ipynb)): Dual-database PubMed + Europe PMC retrieval (`11` duplicates stripped; automates mechanical prep & count accounting only — not a standalone systematic review) paired with an explicit clinical false-positive precision audit.
 
 ## Quickstart
 

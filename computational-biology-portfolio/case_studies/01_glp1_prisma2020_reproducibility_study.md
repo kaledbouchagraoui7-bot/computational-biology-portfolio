@@ -33,7 +33,7 @@ We specifically examine both:
 | **Excluded at screening (missing/incomplete abstract)** | `2` | Auto-flagged before assessment |
 | **Reports assessed for eligibility** | `122` | `124 - 2 = 122` (exact) |
 | **Excluded beyond `25`-study recency window cap** | `97` | Date/rank cutoff applied deterministically |
-| **Studies included in structured matrix** | **`25`** | `122 - 97 = 25` (exact, `0` arithmetic drift) |
+| **Studies included in structured matrix** | **`25`** | `122 - 97 = 25` (exact count reconciliation; mechanical prep only) |
 
 ![GLP-1 Cardiorenal PRISMA 2020 Conservation Flowchart](artifacts/glp1_prisma_2020_flowchart.png)
 
@@ -52,7 +52,7 @@ Inspecting the `10` top-ranked included records in [`glp1_study_summary.json`](a
 
 ### Operational Takeaway
 
-Deterministic code reliably handles **API retrieval, PMID/DOI deduplication (`135 -> 124`), conservation arithmetic, Vancouver citation formatting, and amber QA highlighting** of missing DOIs/conclusions. However, **PICO clinical inclusion decisions, Risk-of-Bias (`RoB-2` / `ROBINS-I`) grading, and EU MDR MEDDEV 2.7/1 Rev 4 equivalence rationales** strictly require a qualified medical writer or clinician.
+Deterministic code **automates the mechanical prep** (**API retrieval, PMID/DOI deduplication (`135 -> 124`), flow-count arithmetic, Vancouver citation formatting, and amber QA highlighting** of missing DOIs/conclusions). It is **not** a complete systematic review: **PICO clinical inclusion decisions, Risk-of-Bias (`RoB-2` / `ROBINS-I`) grading, and EU MDR MEDDEV 2.7/1 Rev 4 equivalence rationales** strictly require a qualified medical writer or clinician.
 
 ---
 
