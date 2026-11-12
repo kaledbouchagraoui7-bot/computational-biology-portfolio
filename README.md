@@ -8,17 +8,27 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/kaledbouchagraoui7-bot/computational-biology-portfolio/blob/main/computational-biology-portfolio/02_clinical_trial_eda.ipynb)
 
+> **100% Free & Open-Source (MIT):** Designed for university researchers, students, medical writers, and small clinical teams needing reproducible PRISMA 2020 screening matrices, ICH E9 baseline statistics, and version-pinned NCBI sequence checks — zero paid APIs required.
+
 ---
 
 ## Executive Capabilities
 
-This repository automates the three highest-friction deliverables in **clinical evaluation, medical writing, and biostatistics QA** under strict **ALCOA+ traceability** and **zero-fabrication guarantees**:
+This repository automates the three highest-friction mechanical workflows in **clinical literature synthesis, biostatistics QA, and sequence QC** under strict **ALCOA+ traceability** and **zero-fabrication guarantees**:
 
 | Module | Regulatory Standard | Key Automated Deliverables |
 |---|---|---|
 | **01 — Reference Transcript & Variant QC**<br>[`01_ncbi_sequence_analyzer.py`](computational-biology-portfolio/01_ncbi_sequence_analyzer.py) | **ICH E6(R2) §4.9 · FDA/IVDR Genetic Biomarker Dossiers** | Versioned NCBI RefSeq/Entrez mRNA retrieval (`NM_000492.4`), ambiguity-aware GC screening, 3-frame ORF verification, and immutable accession-version logging. |
 | **02 — Clinical Trial Data Cleaning & Baseline Table 1**<br>[`02_clinical_trial_eda.py`](computational-biology-portfolio/02_clinical_trial_eda.py) | **ICH E9 §5.2 · CDISC Harmonisation · CONSORT** | Auditable de-duplication and outlier trail (`cleaned_cohort.csv`), baseline **Table 1** (Welch t-test & Pearson χ² validated to `<1e-9` vs. SciPy), and transparent distribution figure ([`table1_demographics.png`](computational-biology-portfolio/table1_demographics.png)). |
 | **03 — Systematic Literature & PRISMA 2020 Packager**<br>[`03_pubmed_literature_synthesizer.py`](computational-biology-portfolio/03_pubmed_literature_synthesizer.py) + [`pilot_package_generator.py`](computational-biology-portfolio/pilot_package_generator.py) | **EU MDR 2017/745 Annex XIV · MEDDEV 2.7/1 Rev 4 · ICH M4** | Dual-source NCBI PubMed + Europe PMC REST queries, exact PRISMA 2020 conservation accounting, Vancouver-cited **Landscape Word Evidence Table (`.docx`)**, **4-sheet Excel Screening Matrix (`.xlsx`)** with soft amber QA highlights on missing fields, and **300-DPI PRISMA 2020 Flow Diagram (`.png` / `.pdf`)**. |
+
+## Automation Boundaries: What Code Does vs. Human Judgment
+
+| What These Scripts Automate (Deterministic) | What Requires Qualified Human Judgment (Clinical / Biostats) |
+|---|---|
+| Cross-database PubMed + Europe PMC querying, PMID/DOI deduplication, and exact PRISMA flow arithmetic | PICO clinical inclusion/exclusion decisions, risk-of-bias (RoB-2 / ROBINS-I) appraisal, and CER equivalence justification |
+| Exact Welch t-test / χ² / Shapiro-Wilk baseline Table 1 math and outlier flagging | Clinical significance interpretation, handling of missing-not-at-random bias, and protocol deviation adjudication |
+| Version-pinned RefSeq transcript QC and 3-frame ORF verification | Variant pathogenicity classification (ACMG/AMP) and clinical biomarker validation |
 
 ---
 
