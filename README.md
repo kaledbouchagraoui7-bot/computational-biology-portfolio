@@ -43,6 +43,23 @@ This repository automates the three highest-friction mechanical workflows in **c
 - **[Case Study 02 — Ground-Truth Benchmark vs. Published Review (`PMC13739473`)](computational-biology-portfolio/case_studies/02_published_prisma_ground_truth_benchmark.md)**: Re-runs the exact published PubMed query from *Sports genomics research in Turkish athlete populations (2019–2026)* (`226` vs. `225` reported MEDLINE records, `99.56%` match), deduplicates `422` combined PubMed + Europe PMC records down to `251` unique records, and documents why human full-text eligibility screening remains mandatory.
 - **[Case Study 01 — GLP-1 Cardiorenal PRISMA 2020 Screening Audit (`135 -> 25` studies)](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.md)** · ([Reproducible Notebook](computational-biology-portfolio/case_studies/01_glp1_prisma2020_reproducibility_study.ipynb)): Dual-database PubMed + Europe PMC retrieval (`11` duplicates stripped; automates mechanical prep & count accounting only — not a standalone systematic review) paired with an explicit clinical false-positive precision audit.
 
+## Regulatory Medical Writing Portfolio (12 ALCOA+ Specimens)
+
+Prepared from public ClinicalTrials.gov (`NCT03719066`), openFDA, and PubMed/Europe PMC records with cross-document numeric consistency and explicit non-sponsor portfolio disclaimers in [`regulatory_writing_specimens/`](regulatory_writing_specimens/):
+
+1. [Specimen #1 — ICH E3 CSR Synopsis (`NCT03719066`)](regulatory_writing_specimens/Specimen_01_ICH_E3_CSR_Synopsis_NCT03719066.md)
+2. [Specimen #2 — EU CTR 536/2014 Plain Language Summary](regulatory_writing_specimens/Specimen_02_EU_CTR_Plain_Language_Summary_NCT03719066.md)
+3. [Specimen #3 — ICH E6(R3) §7 Investigator's Brochure Update](regulatory_writing_specimens/Specimen_03_ICH_E6_Investigators_Brochure_Update.md)
+4. [Specimen #4 — EU MDR Class IIa CER Skeleton (`CardioTrack-IIa`)](regulatory_writing_specimens/Specimen_04_EU_MDR_CER_Skeleton_CardioTrack-IIa.md)
+5. [Specimen #5 — Medical Information Standard Response Document (SRD)](regulatory_writing_specimens/Specimen_05_Standard_Response_Document_SRD.md)
+6. [Specimen #6 — PRISMA 2020 Systematic Review (`99.56%` `PMC13739473` Benchmark)](regulatory_writing_specimens/Specimen_06_PRISMA_2020_Systematic_Review.md)
+7. [Specimen #7 — ICH E2F DSUR Executive Summary](regulatory_writing_specimens/Specimen_07_ICH_E2F_DSUR_Executive_Summary.md)
+8. [Specimen #8 — ICH M11 Clinical Trial Protocol Synopsis](regulatory_writing_specimens/Specimen_08_ICH_M11_Protocol_Synopsis.md)
+9. [Specimen #9 — ICH M4E(R2) CTD Module 2.5 Clinical Overview](regulatory_writing_specimens/Specimen_09_CTD_Module_2_5_Clinical_Overview.md)
+10. [Specimen #10 — ICH M4E(R2) CTD Module 2.7.3 Clinical Efficacy](regulatory_writing_specimens/Specimen_10_CTD_Module_2_7_3_Clinical_Efficacy.md)
+11. [Specimen #11 — ICH M4E(R2) CTD Module 2.7.4 Clinical Safety](regulatory_writing_specimens/Specimen_11_CTD_Module_2_7_4_Clinical_Safety.md)
+12. [Specimen #12 — EU MDR Annex XIV Part B PMCF Evaluation Report](regulatory_writing_specimens/Specimen_12_EU_MDR_PMCF_Evaluation_Report.md)
+
 ## Quickstart
 
 ```bash
