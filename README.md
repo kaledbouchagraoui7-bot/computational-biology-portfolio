@@ -4,7 +4,7 @@
 
 # Clinical Literature, Biostatistics & Sequence QC Automation
 
-[![CI](https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio/actions/workflows/ci.yml)
+[![CI](https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/kaledbouchagraoui7-bot/computational-biology-portfolio/actions/workflows/ci.yml) [![DOI](https://zenodo.org/badge/1424773636.svg)](https://doi.org/10.5281/zenodo.24256652)
 
 **ALCOA+ Reproducible Pipelines for EU MDR Annex XIV (MEDDEV 2.7/1 Rev 4), ICH E6(R2) / E9 / M4, and EFSA / Cosmetovigilance Evidence Dossiers.**
 
