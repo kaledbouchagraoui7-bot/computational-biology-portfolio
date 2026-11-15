@@ -35,3 +35,5 @@ Thumbs.db
 
 # Temporary figures
 /temp_*.png
+
+dist/

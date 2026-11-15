@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-clinical-reg-tools"
+version = "1.0.0"
+description = "ALCOA+ Regulatory Medical Writing, EU CTR 536/2014 PLS Scorer, ClinicalTrials.gov v2 Parser & ICH E3/CONSORT Linter"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Kaled Bouchagraoui", email = "kaledbouchagraoui7@gmail.com" }]
+keywords = ["clinical-trials", "regulatory-affairs", "medical-writing", "alcoa-plus", "prisma-2020", "ich-e3"]
+dependencies = []
+
+[project.scripts]
+eu-ctr-pls-scorer = "src.eu_ctr_pls_scorer:main"
+ctgov-eligibility-parser = "src.ctgov_eligibility_parser:main"
+ich-e3-consort-linter = "src.ich_e3_consort_linter:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "computational-biology-portfolio"]

@@ -136,6 +136,28 @@
         </tbody>
       </table>
     </section>
+
+    <section class="panel" id="reg-checker-panel">
+      <div class="eyebrow">Client-Side Regulatory QA &middot; EU CTR 536/2014 &amp; ICH E3 / CONSORT 2010</div>
+      <h2 style="font-family: Georgia, serif; margin: 4px 0 8px 0;">EU CTR Plain-Language Summary &amp; ICH E3 Quick-Checker</h2>
+      <p style="color: var(--muted); font-size: 13.5px; margin-bottom: 10px;">
+        Runs 100% in your browser (zero server upload). Paste a clinical lay summary or CSR synopsis below to check EU CTR 536/2014 Annex V coverage, Flesch-Kincaid readability, unexplained medical jargon, or ICH E3 / CONSORT table-vs-prose <code>N=</code> consistency.
+      </p>
+      <div class="controls" style="margin-bottom:8px;">
+        <button class="primary" type="button" id="btn-mode-pls" onclick="setCheckerMode('pls')">Mode 1: EU CTR PLS Scorer</button>
+        <button type="button" id="btn-mode-ich" onclick="setCheckerMode('ich')">Mode 2: ICH E3 / CONSORT Linter</button>
+        <button type="button" onclick="loadCheckerSample()">Load Sample Draft</button>
+        <button class="primary" type="button" onclick="runRegChecker()">Analyze Text</button>
+      </div>
+      <textarea id="reg-input" rows="6" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; font-size:13px; margin-bottom:10px;" placeholder="Paste your EU CTR Plain-Language Summary or ICH E3 CSR synopsis here..."></textarea>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Checklist Coverage</div><div class="kpi-val" id="rc-cov">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Flesch-Kincaid Grade</div><div class="kpi-val" id="rc-fk">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Coleman-Liau Index</div><div class="kpi-val" id="rc-cli">—</div></div>
+        <div class="kpi"><div class="kpi-lbl">Flags / Mismatches</div><div class="kpi-val" id="rc-flags">—</div></div>
+      </div>
+      <div id="rc-details" class="note" style="margin-top:10px;">Click <strong>Load Sample Draft</strong> and <strong>Analyze Text</strong> to test the browser QA engine.</div>
+    </section>
   </main>
 
   <script>
@@ -281,6 +303,114 @@
     }
 
     loadSample("glp1");
+
+    let checkerMode = "pls";
+    const PLS_TRIGGERS = [
+      ["1. Trial ID", ["nct", "eu ct", "eudract", "trial", "study title", "identifier"]],
+      ["2. Sponsor & Contact", ["sponsor", "conducted by", "funded by", "contact"]],
+      ["3. General Purpose", ["purpose", "aim", "why", "objective", "find out"]],
+      ["4. Population", ["participants", "patients", "volunteers", "adults", "aged", "joined"]],
+      ["5. Treatments", ["medicine", "treatment", "placebo", "dose", "received", "group"]],
+      ["6. Adverse Reactions", ["side effect", "adverse", "safety", "unwanted", "reaction"]],
+      ["7. Overall Results", ["result", "outcome", "showed", "compared", "effect"]],
+      ["8. Next Steps", ["next", "future", "further", "more information", "thank"]]
+    ];
+    const ICH_TRIGGERS = [
+      ["1a. Title & NCT ID", ["nct", "eudract", "title", "protocol"]],
+      ["2b. Objectives", ["objective", "primary endpoint", "aim"]],
+      ["3a. Design & Blinding", ["random", "blind", "design", "phase", "arm"]],
+      ["4a. Eligibility", ["inclusion", "exclusion", "eligible", "aged", "setting"]],
+      ["7a. Sample Size & Stats", ["sample size", "statistical", "power", "p-value", "t-test"]],
+      ["13a. Participant Flow", ["enrolled", "randomized", "completed", "discontinued", "n ="]],
+      ["15. Baseline Table 1", ["baseline", "demographic", "age", "sex", "table 1"]],
+      ["17a. Primary Outcome", ["primary outcome", "efficacy", "confidence interval", "mean"]],
+      ["19. Safety & Harms", ["adverse", "safety", "serious adverse", "sae"]],
+      ["22. Conclusions", ["conclusion", "summary", "interpretation", "limitation"]]
+    ];
+    const JARGON_MAP = {
+      "randomized": "assigned by chance (like flipping a coin)",
+      "double-blind": "neither participants nor doctors knew which treatment was given",
+      "efficacy": "how well the treatment worked",
+      "adverse events": "unwanted medical problems",
+      "dyspnea": "shortness of breath",
+      "hypertension": "high blood pressure",
+      "myocardial infarction": "heart attack"
+    };
+
+    function setCheckerMode(mode) {
+      checkerMode = mode;
+      document.getElementById("btn-mode-pls").className = mode === "pls" ? "primary" : "";
+      document.getElementById("btn-mode-ich").className = mode === "ich" ? "primary" : "";
+    }
+
+    function loadCheckerSample() {
+      const el = document.getElementById("reg-input");
+      if (checkerMode === "pls") {
+        el.value = "Trial NCT03719066 was sponsored by Example Clinical Research. The purpose of this study was to find out if the new medicine helped adults aged 18 to 65. Participants received either the study medicine or a placebo group treatment. In this randomized trial, the main results showed improved efficacy compared with placebo. Few unwanted side effects or adverse reactions were reported. Thank you to all patients who joined. For further information, contact the sponsor.";
+      } else {
+        el.value = "Protocol NCT03719066 Synopsis\\nObjective: Evaluate primary endpoint reduction.\\nDesign: Randomized double-blind phase 2 trial.\\nEligibility: Inclusion criteria aged >= 18 at hospital setting.\\nStatistical Methods: Sample size N = 120 (80% power, t-test, p-value < 0.05).\\nParticipant Flow: Enrolled N = 120; 115 completed.\\nBaseline: Table 1 demographics (age, sex) balanced.\\n| Arm | Enrolled |\\n| Total | N = 120 |\\nPrimary Outcome: Efficacy showed mean difference 4.2 (confidence interval).\\nSafety: Mild adverse events; 0 SAE.\\nConclusions: Overall interpretation supports further study with noted limitations.";
+      }
+      runRegChecker();
+    }
+
+    function countSyl(w) {
+      let c = w.toLowerCase().replace(/[^a-z]/g, "");
+      if (!c) return 0;
+      if (c.length <= 3) return 1;
+      c = c.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "").replace(/^y/, "");
+      const m = c.match(/[aeiouy]{1,2}/g);
+      return Math.max(1, m ? m.length : 1);
+    }
+
+    function runRegChecker() {
+      const text = document.getElementById("reg-input").value || "";
+      const lower = text.toLowerCase();
+      const words = text.match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g) || [];
+      const sents = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      const wc = words.length;
+      const sc = Math.max(1, sents.length);
+      const syl = words.reduce((a, w) => a + Math.max(1, countSyl(w)), 0);
+      const chars = words.reduce((a, w) => a + w.replace(/[^A-Za-z0-9]/g, "").length, 0);
+      const fk = wc ? Math.max(0, 0.39 * (wc / sc) + 11.8 * (syl / wc) - 15.59) : 0;
+      const cli = wc ? (0.0588 * (chars / wc) * 100 - 0.296 * (sc / wc) * 100 - 15.8) : 0;
+
+      const list = checkerMode === "pls" ? PLS_TRIGGERS : ICH_TRIGGERS;
+      const present = [];
+      const missing = [];
+      for (const [label, keys] of list) {
+        if (keys.some(k => lower.includes(k))) present.push(label);
+        else missing.push(label);
+      }
+      const cov = ((present.length / list.length) * 100).toFixed(0) + "%";
+
+      let flags = [];
+      if (checkerMode === "pls") {
+        for (const [term, plain] of Object.entries(JARGON_MAP)) {
+          const idx = lower.indexOf(term);
+          if (idx !== -1 && !lower.slice(idx, idx + term.length + 40).includes("(")) {
+            flags.push(`<code>${term}</code> &rarr; <em>${plain}</em>`);
+          }
+        }
+      } else {
+        const lines = text.split(/\r?\n/);
+        const tbl = lines.filter(l => l.trim().startsWith("|")).join("\n");
+        const prs = lines.filter(l => !l.trim().startsWith("|")).join("\n");
+        const pN = [...prs.matchAll(/\bN\s*=\s*(\d+)\b/gi)].map(m => m[1]);
+        const tN = [...tbl.matchAll(/\bN\s*=\s*(\d+)\b/gi)].map(m => m[1]);
+        if (pN.length && tN.length && pN.sort().join(",") !== tN.sort().join(",")) {
+          flags.push(`Table N=(${tN.join(",")}) &ne; Prose N=(${pN.join(",")})`);
+        }
+      }
+
+      document.getElementById("rc-cov").textContent = cov;
+      document.getElementById("rc-fk").textContent = fk.toFixed(1);
+      document.getElementById("rc-cli").textContent = cli.toFixed(1);
+      document.getElementById("rc-flags").textContent = flags.length;
+      document.getElementById("rc-details").innerHTML =
+        `<strong>Passed (${present.length}/${list.length}):</strong> ${present.join(", ") || "None"}<br>` +
+        `<strong>Missing:</strong> ${missing.join(", ") || "None"}<br>` +
+        `<strong>${checkerMode === "pls" ? "Jargon Suggestions" : "Numeric Consistency"}:</strong> ${flags.join(" | ") || "Clean (0 flags)"}`;
+    }
   </script>
 </body>
 </html>
