@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from src.eu_ctr_pls_scorer import (
     compute_readability,
     count_syllables,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from src.ich_e3_consort_linter import check_numeric_consistency, lint_document, main
 
 CLEAN_CSR = """
