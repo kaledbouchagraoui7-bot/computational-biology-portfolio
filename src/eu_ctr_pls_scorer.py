@@ -47,7 +47,7 @@ ANNEX_V_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "adverse_reactions",
         "6. Adverse reactions & safety summary",
-        ("side effect", "adverse", "safety", "unwanted", "reaction", "effet secondaire", "indésirable", "sécurité"),
+        ("side effect", "adverse", "safety", "unwanted", "reaction", "effet secondaire", "effets secondaires", "indésirable", "sécurité"),
     ),
     (
         "overall_results",
