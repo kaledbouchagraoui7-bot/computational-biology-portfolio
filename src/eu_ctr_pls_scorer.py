@@ -22,54 +22,58 @@ ANNEX_V_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "trial_identification",
         "1. Trial identification (title, EU CT / NCT ID, dates)",
-        ("nct", "eu ct", "eudract", "trial", "study title", "identifier"),
+        ("nct", "eu ct", "eudract", "trial", "study title", "identifier", "essai", "étude"),
     ),
     (
         "sponsor_contact",
         "2. Sponsor name and contact details",
-        ("sponsor", "conducted by", "funded by", "contact"),
+        ("sponsor", "conducted by", "funded by", "contact", "promoteur", "financé par"),
     ),
     (
         "general_purpose",
         "3. General information & main objective",
-        ("purpose", "aim", "why", "objective", "find out", "designed to"),
+        ("purpose", "aim", "why", "objective", "find out", "designed to", "objectif", "but de cette étude"),
     ),
     (
         "population",
         "4. Study population & eligibility",
-        ("participants", "patients", "volunteers", "adults", "aged", "joined"),
+        ("participants", "patients", "volunteers", "adults", "aged", "joined", "volontaires", "adultes"),
     ),
     (
         "treatments",
         "5. Investigational treatments / interventions tested",
-        ("medicine", "treatment", "placebo", "dose", "received", "group"),
+        ("medicine", "treatment", "placebo", "dose", "received", "group", "médicament", "traitement", "groupe"),
     ),
     (
         "adverse_reactions",
         "6. Adverse reactions & safety summary",
-        ("side effect", "adverse", "safety", "unwanted", "reaction"),
+        ("side effect", "adverse", "safety", "unwanted", "reaction", "effet secondaire", "indésirable", "sécurité"),
     ),
     (
         "overall_results",
         "7. Overall efficacy & main results",
-        ("result", "outcome", "showed", "compared", "effect", "finding"),
+        ("result", "outcome", "showed", "compared", "effect", "finding", "résultat", "montré", "comparé"),
     ),
     (
         "next_steps",
         "8. Comments on outcome & follow-up / next steps",
-        ("next", "future", "further", "more information", "thank"),
+        ("next", "future", "further", "more information", "thank", "suite", "remercions", "plus d'informations"),
     ),
 )
 
-# High-friction medical/statistical jargon with plain-language alternatives
+# High-friction medical/statistical jargon with plain-language alternatives (EN + FR)
 JARGON_GLOSSARY: dict[str, str] = {
     "randomised": "assigned by chance (like flipping a coin)",
     "randomized": "assigned by chance (like flipping a coin)",
+    "randomisé": "réparti par tirage au sort",
     "placebo-controlled": "compared against an inactive look-alike",
     "double-blind": "neither participants nor doctors knew which treatment was given",
+    "double aveugle": "ni les participants ni les médecins ne savaient quel traitement était administré",
     "efficacy": "how well the treatment worked",
     "adverse events": "unwanted medical problems",
     "adverse event": "unwanted medical problem",
+    "effet indésirable": "problème médical non souhaité",
+    "effets indésirables": "problèmes médicaux non souhaités",
     "pharmacokinetics": "how the body processes the medicine",
     "pharmacodynamics": "how the medicine affects the body",
     "hazard ratio": "relative rate of an event over time",
@@ -85,6 +89,7 @@ JARGON_GLOSSARY: dict[str, str] = {
     "cohort": "group of participants",
     "inclusion criteria": "rules for who could join",
     "exclusion criteria": "rules for who could not join",
+    "critères d'inclusion": "règles définissant qui pouvait participer",
 }
 
 

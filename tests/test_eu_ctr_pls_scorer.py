@@ -63,3 +63,30 @@ def test_cli_json_output(tmp_path: Path) -> None:
     rc = main([str(in_file), "--format", "json", "--out", str(out_file)])
     assert rc == 0
     assert '"annex_v_coverage_pct": 100.0' in out_file.read_text(encoding="utf-8")
+
+
+def test_french_annex_v_full_coverage() -> None:
+    fr_pls = (
+        "Essai NCT03719066 conduit par le promoteur Example Recherche (contact).\n"
+        "L'objectif principal de cette étude concernait des patients adultes.\n"
+        "Chaque groupe a reçu le médicament étudié ou un placebo.\n"
+        "Les résultats ont montré une amélioration clinique et peu d'effets secondaires.\n"
+        "Nous remercions les volontaires. Pour plus d'informations, contactez le centre.\n"
+    )
+    report = score_pls(fr_pls)
+    assert report.annex_v_coverage_pct == 100.0
+    assert report.annex_v_missing == []
+
+
+def test_french_jargon_flagging_and_inline_explanation() -> None:
+    raw_fr = "Cet essai randomisé en double aveugle a suivi chaque effet indésirable."
+    flagged = {item["term"] for item in find_unexplained_jargon(raw_fr)}
+    assert "randomisé" in flagged
+    assert "double aveugle" in flagged
+    assert "effet indésirable" in flagged
+
+    explained_fr = "Cet essai randomisé (réparti par tirage au sort) en double aveugle (ni médecin ni patient) est terminé."
+    flagged_exp = {item["term"] for item in find_unexplained_jargon(explained_fr)}
+    assert "randomisé" not in flagged_exp
+    assert "double aveugle" not in flagged_exp
+
