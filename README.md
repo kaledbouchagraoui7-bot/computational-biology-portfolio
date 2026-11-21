@@ -75,3 +75,8 @@ python -m unittest test_pilot_package.py -v
 
 ---
 *MIT © 2026 Sentinel Regulatory & Technical Operations — Strict public-registry and synthetic-cohort traceability only. Zero patient PHI ingested.*
+
+## PRISMA 2020 QC screen
+
+`python -m src.prisma_consort_qc manuscript.md [--min-coverage 80]` screens a systematic-review manuscript against the 27 PRISMA 2020 items (keyword evidence; a screening aid, not a substitute for human review). Exit code 0 = pass, 1 = below threshold, 2 = file error.
+
