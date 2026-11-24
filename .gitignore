@@ -37,3 +37,6 @@ Thumbs.db
 /temp_*.png
 
 dist/
+.env
+*.key
+.runtime/

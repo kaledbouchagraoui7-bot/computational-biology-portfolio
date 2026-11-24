@@ -12,10 +12,28 @@ import argparse
 import hashlib
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+RULE_CATALOG_VERSION: str = "EU-CTR-536/2014-Annex-V-v2.1"
+REGULATION_REF: str = "Regulation (EU) No 536/2014 Article 37 & Annex V"
+LIMITATION_NOTE: str = (
+    "Deterministic heuristic pre-screening aid; does not replace formal regulatory "
+    "medical writing review or Ethics Committee approval."
+)
+PROMOTIONAL_CLAIMS_TERMS: tuple[str, ...] = (
+    "miracle",
+    "100% cure",
+    "guaranteed cure",
+    "risk-free",
+    "completely safe",
+    "best drug ever",
+    "revolutionary breakthrough",
+    "guérison garantie",
+    "sans aucun risque",
+)
 
 # EU CTR 536/2014 Annex V mandatory elements (key, display label, keyword triggers)
 ANNEX_V_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
@@ -113,6 +131,11 @@ class PLSAuditReport:
     annex_v_coverage_pct: float
     jargon_flagged: list[dict[str, str]]
     readability_band: str
+    rule_catalog_version: str = RULE_CATALOG_VERSION
+    promotional_claims_detected: list[str] = field(default_factory=list)
+    compliance_passed: bool = True
+    rule_evaluations: list[dict[str, Any]] = field(default_factory=list)
+    limitation_note: str = LIMITATION_NOTE
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -122,11 +145,14 @@ class PLSAuditReport:
             "# EU CTR 536/2014 Annex V Plain-Language Summary Audit",
             "",
             f"- **Generated (UTC):** `{self.generated_utc}`",
+            f"- **Rule Catalog Version:** `{self.rule_catalog_version}`",
             f"- **Source SHA-256:** `{self.source_sha256}`",
+            f"- **Compliance Status:** `{'PASS' if self.compliance_passed else 'NEEDS_REVISION'}`",
             f"- **Annex V Coverage:** `{self.annex_v_coverage_pct:.1f}%` ({len(self.annex_v_present)}/{len(ANNEX_V_SECTIONS)})",
             f"- **Flesch-Kincaid Grade Level:** `{self.readability.flesch_kincaid_grade:.2f}` ({self.readability_band})",
             f"- **Coleman-Liau Index:** `{self.readability.coleman_liau_index:.2f}`",
             f"- **Counts:** {self.readability.words} words, {self.readability.sentences} sentences, {self.readability.syllables} syllables",
+            f"- **Limitation Note:** {self.limitation_note}",
             "",
             "## Annex V Checklist",
             *(f"- [x] {item}" for item in self.annex_v_present),
@@ -141,6 +167,11 @@ class PLSAuditReport:
                 )
         else:
             lines.append("- None detected.")
+        lines.extend(["", "## Structured Rule Evaluations"])
+        for rule in self.rule_evaluations:
+            lines.append(
+                f"- `{rule['rule_id']}` (`{rule['severity']}`, `passed={rule['passed']}` — {rule['regulation_ref']})"
+            )
         return "\n".join(lines) + "\n"
 
 
@@ -216,8 +247,14 @@ def classify_readability_band(fk_grade: float) -> str:
     return "Too technical for general lay audience (> Grade 11)"
 
 
+def detect_promotional_claims(text: str) -> list[str]:
+    """Detect non-neutral / promotional claims disallowed in lay trial summaries."""
+    lower = (text or "").lower()
+    return [term for term in PROMOTIONAL_CLAIMS_TERMS if re.search(rf"\b{re.escape(term)}\b", lower)]
+
+
 def score_pls(text: str) -> PLSAuditReport:
-    """Score a Plain-Language Summary against EU CTR 536/2014 Annex V."""
+    """Score a Plain-Language Summary against EU CTR 536/2014 Annex V with structured rule traceability."""
     lower = text.lower()
     present: list[str] = []
     missing: list[str] = []
@@ -230,7 +267,45 @@ def score_pls(text: str) -> PLSAuditReport:
     coverage = round((len(present) / len(ANNEX_V_SECTIONS)) * 100.0, 1)
     readability = compute_readability(text)
     jargon = find_unexplained_jargon(text)
+    promo = detect_promotional_claims(text)
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    sec_ok = len(missing) == 0
+    read_ok = readability.flesch_kincaid_grade <= 11.0
+    jargon_ok = len(jargon) == 0
+    promo_ok = len(promo) == 0
+
+    rule_evaluations = [
+        {
+            "rule_id": "EU_CTR_ANNEX_V_REQUIRED_SECTIONS",
+            "regulation_ref": REGULATION_REF,
+            "severity": "PASS" if sec_ok else "CRITICAL",
+            "passed": sec_ok,
+            "evidence_spans": list(missing),
+        },
+        {
+            "rule_id": "EU_CTR_ANNEX_V_PROMOTIONAL_LANGUAGE",
+            "regulation_ref": REGULATION_REF,
+            "severity": "PASS" if promo_ok else "CRITICAL",
+            "passed": promo_ok,
+            "evidence_spans": list(promo),
+        },
+        {
+            "rule_id": "EU_CTR_ANNEX_V_READABILITY",
+            "regulation_ref": REGULATION_REF,
+            "severity": "PASS" if read_ok else "MAJOR",
+            "passed": read_ok,
+            "evidence_spans": [f"FK={readability.flesch_kincaid_grade:.2f}"],
+        },
+        {
+            "rule_id": "EU_CTR_ANNEX_V_JARGON",
+            "regulation_ref": REGULATION_REF,
+            "severity": "PASS" if jargon_ok else "MINOR",
+            "passed": jargon_ok,
+            "evidence_spans": [j["term"] for j in jargon],
+        },
+    ]
+    compliance_passed = sec_ok and promo_ok and read_ok
 
     return PLSAuditReport(
         generated_utc=datetime.now(timezone.utc).isoformat(),
@@ -241,7 +316,58 @@ def score_pls(text: str) -> PLSAuditReport:
         annex_v_coverage_pct=coverage,
         jargon_flagged=jargon,
         readability_band=classify_readability_band(readability.flesch_kincaid_grade),
+        rule_catalog_version=RULE_CATALOG_VERSION,
+        promotional_claims_detected=promo,
+        compliance_passed=compliance_passed,
+        rule_evaluations=rule_evaluations,
+        limitation_note=LIMITATION_NOTE,
     )
+
+
+def score_plain_language_summary(text: str) -> dict[str, Any]:
+    """Dictionary wrapper exposing structured EU CTR Annex V rule evaluations & readability metrics."""
+    rep = score_pls(text)
+    payload = rep.to_dict()
+    payload["readability_score"] = rep.readability.flesch_kincaid_grade
+    payload["jargon_detected"] = [item["term"] for item in rep.jargon_flagged]
+    payload["missing_sections"] = list(rep.annex_v_missing)
+    payload["numerical_consistency"] = check_numerical_consistency(text)
+    return payload
+
+
+def check_numerical_consistency(text: str) -> dict[str, Any]:
+    """
+    Detect explicit enrollment / percentage inconsistencies in synthetic PLS text
+    (e.g., mismatched total N vs. arm sums when stated as 'total of N' alongside 'group A + group B').
+    """
+    findings: list[str] = []
+    pcts = [float(x) for x in re.findall(r"\b(\d+(?:\.\d+)?)\s*%", text or "")]
+    bad_pcts = [p for p in pcts if p > 100.0]
+    if bad_pcts:
+        findings.append(f"percentage_exceeds_100:{bad_pcts}")
+    total_m = re.search(r"total\s+of\s+(\d+)\s+(?:patients|participants|volunteers)", (text or "").lower())
+    arms = [int(x) for x in re.findall(r"(?:arm|group)\s+[ab12][:\s]+(\d+)\s+(?:patients|participants)", (text or "").lower())]
+    if total_m and len(arms) >= 2:
+        stated_total = int(total_m.group(1))
+        arm_sum = sum(arms[:2])
+        if stated_total != arm_sum:
+            findings.append(f"enrollment_mismatch:stated_total={stated_total}_vs_arm_sum={arm_sum}")
+    return {"consistent": len(findings) == 0, "percentages_checked": len(pcts), "findings": findings}
+
+
+def compare_translation_alignment(en_text: str, fr_text: str) -> dict[str, Any]:
+    """Compare EN vs FR EU CTR Annex V structural coverage and flag missing translated elements."""
+    en_rep = score_pls(en_text)
+    fr_rep = score_pls(fr_text)
+    en_set = set(en_rep.annex_v_present)
+    fr_set = set(fr_rep.annex_v_present)
+    return {
+        "aligned": en_set == fr_set,
+        "en_coverage_pct": en_rep.annex_v_coverage_pct,
+        "fr_coverage_pct": fr_rep.annex_v_coverage_pct,
+        "missing_in_fr": sorted(en_set - fr_set),
+        "missing_in_en": sorted(fr_set - en_set),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

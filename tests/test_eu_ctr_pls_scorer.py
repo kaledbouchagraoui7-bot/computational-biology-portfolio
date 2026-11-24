@@ -5,10 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.eu_ctr_pls_scorer import (
+    LIMITATION_NOTE,
+    RULE_CATALOG_VERSION,
+    check_numerical_consistency,
+    compare_translation_alignment,
     compute_readability,
     count_syllables,
+    detect_promotional_claims,
     find_unexplained_jargon,
     main,
+    score_plain_language_summary,
     score_pls,
 )
 
@@ -89,4 +95,40 @@ def test_french_jargon_flagging_and_inline_explanation() -> None:
     flagged_exp = {item["term"] for item in find_unexplained_jargon(explained_fr)}
     assert "randomisé" not in flagged_exp
     assert "double aveugle" not in flagged_exp
+
+
+def test_structured_rule_traceability_and_promotional_claims() -> None:
+    promo_pls = COMPLETE_PLS + "\nThis miracle guaranteed cure is risk-free for every patient.\n"
+    res = score_plain_language_summary(promo_pls)
+    assert res["rule_catalog_version"] == RULE_CATALOG_VERSION
+    assert res["limitation_note"] == LIMITATION_NOTE
+    assert res["compliance_passed"] is False
+    assert len(res["promotional_claims_detected"]) >= 2
+    rule_ids = {r["rule_id"] for r in res["rule_evaluations"]}
+    assert {
+        "EU_CTR_ANNEX_V_REQUIRED_SECTIONS",
+        "EU_CTR_ANNEX_V_PROMOTIONAL_LANGUAGE",
+        "EU_CTR_ANNEX_V_READABILITY",
+        "EU_CTR_ANNEX_V_JARGON",
+    } <= rule_ids
+
+
+def test_numerical_consistency_and_bilingual_alignment() -> None:
+    bad_nums = "A total of 120 patients joined: Group A: 50 patients and Group B: 50 patients. Improvement was 105%."
+    num_res = check_numerical_consistency(bad_nums)
+    assert num_res["consistent"] is False
+    assert len(num_res["findings"]) == 2
+
+    en_pls = COMPLETE_PLS
+    fr_pls = (
+        "Essai NCT03719066 conduit par le promoteur Example Recherche (contact).\n"
+        "L'objectif principal de cette étude concernait des patients adultes.\n"
+        "Chaque groupe a reçu le médicament étudié ou un placebo.\n"
+        "Les résultats ont montré une amélioration clinique et peu d'effets secondaires.\n"
+        "Nous remercions les volontaires. Pour plus d'informations, contactez le centre.\n"
+    )
+    align = compare_translation_alignment(en_pls, fr_pls)
+    assert align["aligned"] is True
+    assert align["en_coverage_pct"] == 100.0
+    assert align["fr_coverage_pct"] == 100.0
 
