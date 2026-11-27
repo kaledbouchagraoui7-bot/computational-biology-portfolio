@@ -11,7 +11,6 @@ from src.eu_ctr_pls_scorer import (
     compare_translation_alignment,
     compute_readability,
     count_syllables,
-    detect_promotional_claims,
     find_unexplained_jargon,
     main,
     score_plain_language_summary,
